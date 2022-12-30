@@ -8,7 +8,9 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub treasury_id: Uuid,
     #[sea_orm(primary_key, auto_increment = false)]
-    pub vault_wallet_id: Uuid,
+    pub address: String,
+    pub legacy_address: String,
+    pub tag: String,
     pub created_at: DateTime,
     pub removed_at: Option<DateTime>,
     pub user_id: Uuid,

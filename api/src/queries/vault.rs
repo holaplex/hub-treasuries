@@ -1,9 +1,12 @@
 use std::sync::Arc;
 
 use async_graphql::{self, Context, Object, Result};
+use fireblocks::{
+    client::FireblocksClient,
+    objects::vault::{QueryVaultAccounts, VaultAccount, VaultAccountsPagedResponse},
+};
 use sea_orm::{prelude::*, QueryOrder};
 
-use crate::models::organizations;
 #[derive(Default)]
 pub struct Query;
 
@@ -13,29 +16,38 @@ impl Query {
     ///
     /// # Errors
     /// This function fails if ...
-    async fn organizations(&self, ctx: &Context<'_>) -> Result<Vec<organizations::Model>> {
-        let db = &**ctx.data::<Arc<DatabaseConnection>>()?;
-
-        organizations::Entity::find()
-            .order_by_desc(organizations::Column::CreatedAt)
-            .all(db)
-            .await
-            .map_err(Into::into)
-    }
-    /// Res
-    ///
-    /// # Errors
-    /// This function fails if ...
-    async fn organization(
+    async fn vaults(
         &self,
         ctx: &Context<'_>,
-        id: uuid::Uuid,
-    ) -> Result<Option<organizations::Model>> {
-        let db = ctx.data::<DatabaseConnection>()?;
+        asset_id: Option<u64>,
+        limit: Option<u64>,
+        order_by: Option<String>,
+    ) -> Result<VaultAccountsPagedResponse> {
+        let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
 
-        organizations::Entity::find_by_id(id)
-            .one(db)
-            .await
-            .map_err(Into::into)
+        let vaults = fireblocks
+            .get_vaults(QueryVaultAccounts {
+                name_prefix: None,
+                name_suffix: None,
+                min_amount_threshold: None,
+                asset_id,
+                order_by: order_by.unwrap_or("DESC".to_string()),
+                limit: limit.unwrap_or(500),
+                before: None,
+                after: None,
+                max_bip44_address_index_used: 966,
+                max_bip44_change_address_index_used: 20,
+            })
+            .await?;
+
+        Ok(vaults)
+    }
+
+    async fn vault(&self, ctx: &Context<'_>, vault_id: String) -> Result<VaultAccount> {
+        let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
+
+        let vault = fireblocks.get_vault(vault_id).await?;
+
+        Ok(vault)
     }
 }

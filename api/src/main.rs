@@ -40,7 +40,7 @@
 
 mod db;
 #[allow(clippy::pedantic)]
-mod entities;
+mod models;
 mod mutations;
 mod queries;
 
@@ -63,8 +63,8 @@ use async_graphql::{
     EmptySubscription, Schema,
 };
 use async_graphql_poem::{GraphQLRequest, GraphQLResponse};
-use dataloaders::OrganizationLoader;
 use db::Connection;
+use fireblocks::client::FireblocksClient;
 use mutations::Mutation;
 use poem::{
     async_trait, get, handler,
@@ -121,7 +121,7 @@ async fn graphql_handler(
 
 pub struct Context {
     db: Arc<DatabaseConnection>,
-    fireblocks_client: FireblocksClient,
+    fireblocks: Arc<FireblocksClient>,
 }
 
 impl Context {
@@ -131,13 +131,10 @@ impl Context {
             .context("failed to get database connection")?
             .get();
 
-        let organization_loader =
-            DataLoader::new(OrganizationLoader::new(db.clone()), tokio::spawn);
+        let fireblocks =
+            Arc::new(FireblocksClient::new().context("failed to build fireblocks client")?);
 
-        Ok(Self {
-            db,
-            organization_loader,
-        })
+        Ok(Self { db, fireblocks })
     }
 }
 /// Builds the GraphQL Schema, attaching the Database to the context
@@ -148,7 +145,7 @@ pub async fn build_schema(ctx: Context) -> Result<AppSchema> {
         .extension(ApolloTracing)
         .extension(Logger)
         .data(ctx.db)
-        .data(ctx.organization_loader)
+        .data(ctx.fireblocks)
         .finish();
 
     Ok(schema)

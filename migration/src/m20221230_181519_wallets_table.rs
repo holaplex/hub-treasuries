@@ -14,7 +14,9 @@ impl MigrationTrait for Migration {
                     .table(Wallets::Table)
                     .if_not_exists()
                     .col(ColumnDef::new(Wallets::TreasuryId).uuid().not_null())
-                    .col(ColumnDef::new(Wallets::VaultWalletId).uuid().not_null())
+                    .col(ColumnDef::new(Wallets::Address).string().not_null())
+                    .col(ColumnDef::new(Wallets::LegacyAddress).string().not_null())
+                    .col(ColumnDef::new(Wallets::Tag).string().not_null())
                     .col(
                         ColumnDef::new(Wallets::CreatedAt)
                             .timestamp()
@@ -26,7 +28,7 @@ impl MigrationTrait for Migration {
                     .primary_key(
                         Index::create()
                             .col(Wallets::TreasuryId)
-                            .col(Wallets::VaultWalletId),
+                            .col(Wallets::Address),
                     )
                     .foreign_key(
                         ForeignKey::create()
@@ -63,7 +65,9 @@ impl MigrationTrait for Migration {
 enum Wallets {
     Table,
     TreasuryId,
-    VaultWalletId,
+    Address,
+    LegacyAddress,
+    Tag,
     UserId,
     CreatedAt,
     RemovedAt,

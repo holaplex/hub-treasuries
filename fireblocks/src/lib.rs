@@ -3,10 +3,10 @@ pub mod objects;
 pub mod signer;
 
 use anyhow::{Context, Result};
-use client::FireBlocksClient;
+use client::FireblocksClient;
 
-pub fn build() -> Result<FireBlocksClient> {
-    let client = FireBlocksClient::new().context("failed to construct client")?;
+pub fn build() -> Result<FireblocksClient> {
+    let client = FireblocksClient::new().context("failed to construct client")?;
 
     Ok(client)
 }
