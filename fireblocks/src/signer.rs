@@ -1,9 +1,6 @@
 use anyhow::{Context, Result};
 use chrono::prelude::*;
-use clap::{arg, Parser};
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
-use log::debug;
-use reqwest::{Client as HttpClient, RequestBuilder, Url};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 

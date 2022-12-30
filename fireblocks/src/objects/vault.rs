@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 /// Paged
 /// Query parameters
-/// https://docs.fireblocks.com/api/?javascript#list-vault-accounts-paged
+/// <https://docs.fireblocks.com/api/?javascript#list-vault-accounts-paged>
 #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct QueryVaultAccounts {
@@ -26,7 +26,7 @@ pub struct Paging {
     pub after: String,
 }
 
-/// https://docs.fireblocks.com/api/?javascript#vaultaccountspagedresponse
+/// <https://docs.fireblocks.com/api/?javascript#vaultaccountspagedresponse>
 #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct VaultAccountsPagedResponse {
@@ -39,7 +39,7 @@ pub struct VaultAccountsPagedResponse {
 }
 
 /// Query Response
-/// https://docs.fireblocks.com/api/?javascript#vaultaccount
+/// <https://docs.fireblocks.com/api/?javascript#vaultaccount>
 #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct VaultAccount {
@@ -51,7 +51,7 @@ pub struct VaultAccount {
     pub assets: Vec<VaultAsset>,
 }
 
-/// https://docs.fireblocks.com/api/?javascript#createvaultassetresponse
+/// <https://docs.fireblocks.com/api/?javascript#createvaultassetresponse>
 #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct VaultAsset {
@@ -78,7 +78,7 @@ pub struct VaultAsset {
 }
 
 /// Query parameters
-/// https://docs.fireblocks.com/api/?javascript#create-a-new-vault-account
+/// <https://docs.fireblocks.com/api/?javascript#create-a-new-vault-account>
 #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateVault {
@@ -88,14 +88,14 @@ pub struct CreateVault {
     pub auto_fuel: Option<String>,
 }
 
-/// https://docs.fireblocks.com/api/?javascript#create-a-new-wallet-under-the-vault-account
+/// <https://docs.fireblocks.com/api/?javascript#create-a-new-wallet-under-the-vault-account>
 #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateVaultWallet {
     pub eos_account_name: Option<String>,
 }
 
-/// https://docs.fireblocks.com/api/?javascript#createvaultassetresponse
+/// <https://docs.fireblocks.com/api/?javascript#createvaultassetresponse>
 #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateVaultAssetResponse {

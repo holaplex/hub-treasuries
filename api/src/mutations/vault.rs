@@ -1,12 +1,12 @@
-use std::{default, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
-use async_graphql::{self, Context, Error, InputObject, Object, Result};
+use async_graphql::{self, Context, Error, Object, Result};
 use fireblocks::{
     client::FireblocksClient,
     objects::vault::{CreateVault, CreateVaultAssetResponse, CreateVaultWallet, VaultAccount},
 };
 use models::prelude::*;
-use sea_orm::{prelude::*, Set, TryIntoModel};
+use sea_orm::{prelude::*, Set};
 use uuid::Uuid;
 
 use crate::{

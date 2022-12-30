@@ -1,13 +1,10 @@
-use std::sync::Arc;
+#![allow(clippy::module_name_repetitions)]
 
 use anyhow::{Context, Result};
-use chrono::prelude::*;
 use clap::{arg, Parser};
-use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
-use log::debug;
+use jsonwebtoken::EncodingKey;
 use reqwest::{Client as HttpClient, RequestBuilder, Url};
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use serde::Serialize;
 
 use crate::{
     objects::vault::{
@@ -35,7 +32,11 @@ pub struct FireblocksClient {
 }
 
 impl FireblocksClient {
-    pub fn new() -> Result<FireblocksClient> {
+    /// Res
+    ///
+    /// # Errors
+    /// This function fails if ...
+    pub fn new() -> Result<Self> {
         let Args {
             fireblocks_endpoint,
             fireblocks_api_key,
@@ -49,20 +50,27 @@ impl FireblocksClient {
         let base_url =
             Url::parse(&fireblocks_endpoint).context("failed to parse fireblocks endpoint")?;
 
-        Ok(FireblocksClient {
+        Ok(Self {
             http,
             request_signer: RequestSigner::new(encoding_key, fireblocks_api_key.clone()),
             base_url,
             api_key: fireblocks_api_key,
         })
     }
+    /// Res
+    ///
+    /// # Errors
+    /// This function fails if ...
 
     fn build_encoding_key(secret_path: String) -> Result<EncodingKey> {
         let rsa = std::fs::read(secret_path).context("failed to read secret key")?;
 
         EncodingKey::from_rsa_pem(&rsa).context("failed to create encoding key")
     }
-
+    /// Res
+    ///
+    /// # Errors
+    /// This function fails if ...
     fn authenticate(
         &self,
         req: RequestBuilder,
@@ -73,7 +81,10 @@ impl FireblocksClient {
 
         Ok(req.header("X-API-KEY", &self.api_key).bearer_auth(token))
     }
-
+    /// Res
+    ///
+    /// # Errors
+    /// This function fails if ...
     pub async fn get_vaults(
         &self,
         filters: QueryVaultAccounts,
@@ -92,9 +103,12 @@ impl FireblocksClient {
 
         Ok(response)
     }
-
+    /// Res
+    ///
+    /// # Errors
+    /// This function fails if ...
     pub async fn get_vault(&self, vault_id: String) -> Result<VaultAccount> {
-        let endpoint = format!("/v1/vault/accounts/{}", vault_id);
+        let endpoint = format!("/v1/vault/accounts/{vault_id}");
         let url = self.base_url.join(&endpoint)?;
 
         let mut req = self.http.get(url);
@@ -103,9 +117,12 @@ impl FireblocksClient {
         let response = req.send().await?.json::<VaultAccount>().await?;
         Ok(response)
     }
-
+    /// Res
+    ///
+    /// # Errors
+    /// This function fails if ...
     pub async fn create_vault(&self, params: CreateVault) -> Result<VaultAccount> {
-        let endpoint = format!("/v1/vault/accounts");
+        let endpoint = "/v1/vault/accounts".to_string();
         let url = self.base_url.join(&endpoint)?;
 
         let mut req = self.http.post(url);
@@ -114,7 +131,10 @@ impl FireblocksClient {
         let response = req.send().await?.json::<VaultAccount>().await?;
         Ok(response)
     }
-
+    /// Res
+    ///
+    /// # Errors
+    /// This function fails if ...
     pub async fn create_vault_wallet(
         &self,
         vault_account_id: String,

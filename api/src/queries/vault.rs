@@ -5,7 +5,6 @@ use fireblocks::{
     client::FireblocksClient,
     objects::vault::{QueryVaultAccounts, VaultAccount, VaultAccountsPagedResponse},
 };
-use sea_orm::{prelude::*, QueryOrder};
 
 #[derive(Default)]
 pub struct Query;

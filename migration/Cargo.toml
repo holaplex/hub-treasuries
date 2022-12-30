@@ -6,9 +6,9 @@ authors = [
   "Holaplex <engineering@holaplex.com>",
 ]
 edition = "2021"
-description = "Holaplex Hub organization service"
+description = "Holaplex Hub treasury service"
 readme = "./README.md"
-repository = "https://github.com/holaplex/hub-orgs"
+repository = "https://github.com/holaplex/hub-treasuries"
 license = "AGPL-3.0-or-later"
 keywords = ["hub", "holaplex", "web3"]
 categories = ["cryptography::cryptocurrencies", "web-programming"]
@@ -18,10 +18,10 @@ name = "migration"
 path = "src/lib.rs"
 
 [dependencies]
-async-std = { version = "^1", features = ["attributes", "tokio1"] }
+async-std = { version = "1.12.0", features = ["attributes", "tokio1"] }
 
 [dependencies.sea-orm-migration]
-version = "^0.10.0"
+version = "0.10.6"
 features = [
   "runtime-tokio-rustls",
   "sqlx-postgres", 

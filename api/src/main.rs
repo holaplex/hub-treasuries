@@ -3,8 +3,7 @@
 #![deny(
     clippy::pedantic,
     clippy::match_wildcard_for_single_variants,
-    clippy::redundant_closure_for_method_calls,
-    clippy::cargo
+    clippy::redundant_closure_for_method_calls
 )]
 #![warn(
     clippy::perf,
@@ -57,7 +56,6 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Context as AnyhowContext, Result};
 use async_graphql::{
-    dataloader::DataLoader,
     extensions::{ApolloTracing, Logger},
     http::{playground_source, GraphQLPlaygroundConfig},
     EmptySubscription, Schema,
@@ -131,8 +129,7 @@ impl Context {
             .context("failed to get database connection")?
             .get();
 
-        let fireblocks =
-            Arc::new(FireblocksClient::new().context("failed to build fireblocks client")?);
+        let fireblocks = fireblocks::build()?;
 
         Ok(Self { db, fireblocks })
     }
