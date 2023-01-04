@@ -45,10 +45,11 @@ pub struct VaultAccountsPagedResponse {
 pub struct VaultAccount {
     pub id: String,
     pub name: String,
+    #[serde(rename = "hiddenOnUI")]
     pub hidden_on_ui: bool,
-    pub customer_ref_id: String,
-    pub auto_fuel: bool,
+    pub auto_fuel: Option<bool>,
     pub assets: Vec<VaultAsset>,
+    pub customer_ref_id: Option<String>,
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#createvaultassetresponse>
@@ -56,25 +57,24 @@ pub struct VaultAccount {
 #[serde(rename_all = "camelCase")]
 pub struct VaultAsset {
     pub id: String,
-    pub total: String,
-    pub balance: String,
-    pub available: String,
-    pub pending: String,
-    pub staked: String,
-    pub frozen: String,
-    pub locked_amount: String,
+    pub total: u64,
+    pub pending: u64,
+    pub locked_amount: u64,
+    pub staked: Option<u64>,
+    pub available: u64,
+    pub frozen: u64,
     #[serde(rename = "maxBip44AddressIndexUsed")]
-    pub max_bip44_address_index_used: u64,
+    pub max_bip44_address_index_used: Option<u64>,
     #[serde(rename = "maxBip44ChangeAddressIndexUsed")]
-    pub max_bip44_change_address_index_used: u64,
-    pub total_staked_cpu: String,
-    pub total_staked_network: String,
-    pub self_staked_cpu: String,
-    pub self_staked_network: String,
-    pub pending_refund_cpu: String,
-    pub pending_refund_network: String,
-    pub block_height: String,
-    pub block_hash: String,
+    pub max_bip44_change_address_index_used: Option<u64>,
+    pub total_staked_cpu: Option<String>,
+    pub total_staked_network: Option<String>,
+    pub self_staked_cpu: Option<String>,
+    pub self_staked_network: Option<String>,
+    pub pending_refund_cpu: Option<String>,
+    pub pending_refund_network: Option<String>,
+    pub block_height: Option<String>,
+    pub block_hash: Option<String>,
 }
 
 /// Query parameters
@@ -85,7 +85,7 @@ pub struct CreateVault {
     pub name: String,
     pub hidden_on_ui: Option<String>,
     pub customer_ref_id: Option<String>,
-    pub auto_fuel: Option<String>,
+    pub auto_fuel: Option<bool>,
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#create-a-new-wallet-under-the-vault-account>
@@ -103,5 +103,5 @@ pub struct CreateVaultAssetResponse {
     pub address: String,
     pub legacy_address: String,
     pub tag: String,
-    pub eos_account_name: String,
+    pub eos_account_name: Option<String>,
 }

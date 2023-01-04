@@ -23,15 +23,20 @@ impl Mutation {
     ///
     /// # Errors
     /// This function fails if ...
-    pub async fn create_vault(&self, ctx: &Context<'_>, project_id: Uuid) -> Result<VaultAccount> {
+    pub async fn create_vault(
+        &self,
+        ctx: &Context<'_>,
+        project_id: String,
+    ) -> Result<VaultAccount> {
         let db = &**ctx.data::<Arc<DatabaseConnection>>()?;
         let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
+        let UserID(id) = ctx.data::<UserID>()?;
 
         let create_vault = CreateVault {
             name: project_id.to_string(),
             hidden_on_ui: None,
-            customer_ref_id: None,
-            auto_fuel: None,
+            customer_ref_id: Some(id.to_string()),
+            auto_fuel: Some(false),
         };
 
         let vault = fireblocks.create_vault(create_vault).await?;
@@ -41,11 +46,11 @@ impl Mutation {
             ..Default::default()
         };
 
-        treasury.clone().insert(db).await?;
+        let treasury: treasuries::Model = treasury.clone().insert(db).await?;
 
         let project_treasuries_active_model = project_treasuries::ActiveModel {
-            project_id: Set(project_id),
-            treasury_id: treasury.id,
+            project_id: Set(Uuid::parse_str(&project_id)?),
+            treasury_id: Set(treasury.id),
             ..Default::default()
         };
 

@@ -3,7 +3,7 @@ use std::{fmt, sync::Arc};
 use async_graphql::{self, Context, Enum, Object, Result};
 use fireblocks::{
     client::FireblocksClient,
-    objects::vault::{QueryVaultAccounts, VaultAccount, VaultAccountsPagedResponse},
+    objects::vault::{QueryVaultAccounts, VaultAccount, VaultAccountsPagedResponse, VaultAsset},
 };
 
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
@@ -66,6 +66,14 @@ impl Query {
         let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
 
         let vault = fireblocks.get_vault(vault_id).await?;
+
+        Ok(vault)
+    }
+
+    async fn vault_assets(&self, ctx: &Context<'_>) -> Result<Vec<VaultAsset>> {
+        let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
+
+        let vault = fireblocks.vault_assets().await?;
 
         Ok(vault)
     }

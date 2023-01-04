@@ -3,13 +3,14 @@
 use anyhow::{Context, Result};
 use clap::{arg, Parser};
 use jsonwebtoken::EncodingKey;
+use log::info;
 use reqwest::{Client as HttpClient, RequestBuilder, Url};
 use serde::Serialize;
 
 use crate::{
     objects::vault::{
         CreateVault, CreateVaultAssetResponse, CreateVaultWallet, QueryVaultAccounts, VaultAccount,
-        VaultAccountsPagedResponse,
+        VaultAccountsPagedResponse, VaultAsset,
     },
     signer::RequestSigner,
 };
@@ -95,13 +96,11 @@ impl FireblocksClient {
         let mut req = self.http.get(url);
         req = self.authenticate(req, endpoint, filters)?;
 
-        let response = req
-            .send()
-            .await?
-            .json::<VaultAccountsPagedResponse>()
-            .await?;
+        let response = req.send().await?.text().await?;
 
-        Ok(response)
+        info!("{:?}", response);
+
+        Ok(serde_json::from_str(&response)?)
     }
     /// Res
     ///
@@ -114,8 +113,11 @@ impl FireblocksClient {
         let mut req = self.http.get(url);
         req = self.authenticate(req, endpoint, ())?;
 
-        let response = req.send().await?.json::<VaultAccount>().await?;
-        Ok(response)
+        let response = req.send().await?.text().await?;
+
+        info!("{:?}", response);
+
+        Ok(serde_json::from_str(&response)?)
     }
     /// Res
     ///
@@ -128,8 +130,11 @@ impl FireblocksClient {
         let mut req = self.http.post(url);
         req = self.authenticate(req, endpoint, params)?;
 
-        let response = req.send().await?.json::<VaultAccount>().await?;
-        Ok(response)
+        let response = req.send().await?.text().await?;
+
+        info!("{:?}", response);
+
+        Ok(serde_json::from_str(&response)?)
     }
     /// Res
     ///
@@ -147,7 +152,28 @@ impl FireblocksClient {
         let mut req = self.http.post(url);
         req = self.authenticate(req, endpoint, body)?;
 
-        let response = req.send().await?.json::<CreateVaultAssetResponse>().await?;
-        Ok(response)
+        let response = req.send().await?.text().await?;
+
+        info!("{:?}", response);
+
+        Ok(serde_json::from_str(&response)?)
+    }
+
+    /// Res
+    ///
+    /// # Errors
+    /// This function fails if ...
+    pub async fn vault_assets(&self) -> Result<Vec<VaultAsset>> {
+        let endpoint = "/v1/vault/assets".to_string();
+        let url = self.base_url.join(&endpoint)?;
+
+        let mut req = self.http.get(url);
+        req = self.authenticate(req, endpoint, ())?;
+
+        let response = req.send().await?.text().await?;
+
+        info!("{:?}", response);
+
+        Ok(serde_json::from_str(&response)?)
     }
 }
