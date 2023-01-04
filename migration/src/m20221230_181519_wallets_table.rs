@@ -24,7 +24,7 @@ impl MigrationTrait for Migration {
                             .extra("default now()".to_string()),
                     )
                     .col(ColumnDef::new(Wallets::RemovedAt).timestamp())
-                    .col(ColumnDef::new(Wallets::UserId).uuid().not_null())
+                    .col(ColumnDef::new(Wallets::CreatedBy).uuid().not_null())
                     .primary_key(
                         Index::create()
                             .col(Wallets::TreasuryId)
@@ -68,7 +68,7 @@ enum Wallets {
     Address,
     LegacyAddress,
     Tag,
-    UserId,
+    CreatedBy,
     CreatedAt,
     RemovedAt,
 }

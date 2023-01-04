@@ -13,7 +13,7 @@ pub struct Model {
     pub tag: String,
     pub created_at: DateTime,
     pub removed_at: Option<DateTime>,
-    pub user_id: Uuid,
+    pub created_by: Uuid,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

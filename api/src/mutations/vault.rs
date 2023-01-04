@@ -27,19 +27,8 @@ impl Mutation {
         let db = &**ctx.data::<Arc<DatabaseConnection>>()?;
         let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
 
-        // insert treasury to get the treasury id
-
-        let mut treasury = treasuries::ActiveModel {
-            vault_id: Set(Uuid::new_v4().to_string()),
-            ..Default::default()
-        };
-
-        treasury.clone().insert(db).await?;
-
-        let treasury_id = treasury.id.clone().unwrap().to_string();
-
         let create_vault = CreateVault {
-            name: treasury_id,
+            name: project_id.to_string(),
             hidden_on_ui: None,
             customer_ref_id: None,
             auto_fuel: None,
@@ -47,11 +36,12 @@ impl Mutation {
 
         let vault = fireblocks.create_vault(create_vault).await?;
 
-        treasury.vault_id = Set(vault.id.clone());
+        let treasury = treasuries::ActiveModel {
+            vault_id: Set(vault.id.clone()),
+            ..Default::default()
+        };
 
-        treasury.clone().update(db).await?;
-
-        // insert into project_treasuries table
+        treasury.clone().insert(db).await?;
 
         let project_treasuries_active_model = project_treasuries::ActiveModel {
             project_id: Set(project_id),
@@ -111,7 +101,7 @@ impl Mutation {
             address: Set(vault.address),
             legacy_address: Set(vault.legacy_address),
             tag: Set(vault.tag),
-            user_id: Set(user_id),
+            created_by: Set(user_id),
             ..Default::default()
         };
         active_model.insert(db).await?;
