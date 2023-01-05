@@ -14,6 +14,7 @@ impl MigrationTrait for Migration {
                     .table(Wallets::Table)
                     .if_not_exists()
                     .col(ColumnDef::new(Wallets::TreasuryId).uuid().not_null())
+                    .col(ColumnDef::new(Wallets::AssetId).string().not_null())
                     .col(ColumnDef::new(Wallets::Address).string().not_null())
                     .col(ColumnDef::new(Wallets::LegacyAddress).string().not_null())
                     .col(ColumnDef::new(Wallets::Tag).string().not_null())
@@ -65,6 +66,7 @@ impl MigrationTrait for Migration {
 enum Wallets {
     Table,
     TreasuryId,
+    AssetId,
     Address,
     LegacyAddress,
     Tag,

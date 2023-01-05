@@ -87,25 +87,20 @@ impl Mutation {
             .await?
             .ok_or_else(|| Error::new("failed to load treasury"))?;
 
-        let vault = fireblocks
+        let vault_asset = fireblocks
             .create_vault_wallet(treasury.vault_id.clone(), asset_id, CreateVaultWallet {
                 eos_account_name: None,
             })
             .await?;
 
-        if vault.id != treasury.vault_id {
-            return Err(Error::new(
-                "vault.id from fireblocks response does not match database treasury vault",
-            ));
-        }
-
-        let v = vault.clone();
+        let v = vault_asset.clone();
 
         let active_model = wallets::ActiveModel {
             treasury_id: Set(treasury_id),
-            address: Set(vault.address),
-            legacy_address: Set(vault.legacy_address),
-            tag: Set(vault.tag),
+            asset_id: Set(vault_asset.id),
+            address: Set(vault_asset.address),
+            legacy_address: Set(vault_asset.legacy_address),
+            tag: Set(vault_asset.tag),
             created_by: Set(user_id),
             ..Default::default()
         };

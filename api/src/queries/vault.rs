@@ -5,6 +5,10 @@ use fireblocks::{
     client::FireblocksClient,
     objects::vault::{QueryVaultAccounts, VaultAccount, VaultAccountsPagedResponse, VaultAsset},
 };
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use uuid::Uuid;
+
+use crate::models::project_treasuries;
 
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum OrderBy {
@@ -77,4 +81,61 @@ impl Query {
 
         Ok(vault)
     }
+
+    async fn project_treasuries(
+        &self,
+        ctx: &Context<'_>,
+        project_id: Uuid,
+    ) -> Result<Vec<project_treasuries::Model>> {
+        let db = ctx.data::<DatabaseConnection>()?;
+        let t = project_treasuries::Entity::find()
+            .filter(project_treasuries::Column::ProjectId.eq(project_id))
+            .all(db)
+            .await?;
+
+        Ok(t)
+    }
 }
+
+// #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
+// pub enum Blockchain {
+//     Polygon,
+//     Solana,
+// }
+
+// #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+// pub struct SolanaWallet {
+//     pub resource: String,
+//     pub address: String,
+//     pub balance: f64,
+//     pub chain: Blockchain,
+
+// }
+
+// #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+// pub struct PolygonWallet {
+//     pub resource: String,
+//     pub address: String,
+//     pub balance: f64,
+//     pub chain: Blockchain,
+
+// }
+
+// #[derive(Interface)]
+// #[graphql(
+//     field(name = "resource", type = "String"),
+//     field(name = "address", type = "String"),
+//     field(name = "balance", type = "&f64"),
+//     field(name = "chain", type = "&Blockchain"),
+// )]
+// enum Wallet {
+//     SolanaWallet(SolanaWallet),
+//     PolygonWallet(PolygonWallet),
+// }
+
+// #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+// pub struct ProjectTreasury {
+//     resource: String,
+//     project: Project!
+//     wallets(limit: Int = 25, offset: Int = 0): [Wallet!]
+//   }

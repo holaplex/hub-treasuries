@@ -22,8 +22,8 @@ pub struct QueryVaultAccounts {
 #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct Paging {
-    pub before: String,
-    pub after: String,
+    pub before: Option<String>,
+    pub after: Option<String>,
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#vaultaccountspagedresponse>
@@ -31,11 +31,11 @@ pub struct Paging {
 #[serde(rename_all = "camelCase")]
 pub struct VaultAccountsPagedResponse {
     pub accounts: Vec<VaultAccount>,
-    pub paging: Paging,
+    pub paging: Option<Paging>,
     #[serde(rename = "previousUrl")]
-    pub previous_url: String,
+    pub previous_url: Option<String>,
     #[serde(rename = "nextUrl")]
-    pub next_url: String,
+    pub next_url: Option<String>,
 }
 
 /// Query Response
@@ -57,12 +57,12 @@ pub struct VaultAccount {
 #[serde(rename_all = "camelCase")]
 pub struct VaultAsset {
     pub id: String,
-    pub total: u64,
-    pub pending: u64,
-    pub locked_amount: u64,
-    pub staked: Option<u64>,
-    pub available: u64,
-    pub frozen: u64,
+    pub total: String,
+    pub pending: String,
+    pub locked_amount: String,
+    pub staked: Option<String>,
+    pub available: String,
+    pub frozen: String,
     #[serde(rename = "maxBip44AddressIndexUsed")]
     pub max_bip44_address_index_used: Option<u64>,
     #[serde(rename = "maxBip44ChangeAddressIndexUsed")]
