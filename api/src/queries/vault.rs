@@ -103,39 +103,66 @@ impl Query {
 //     Solana,
 // }
 
+// #[derive(Union,Debug, Clone, Serialize, Deserialize,)]
+// pub enum Currency {
+//     Lamports(Lamports),
+//     Matic(Matic),
+// }
+
+// #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+// pub struct Lamports {
+//     value: u64,
+// }
+
+// #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+// pub struct Matic {
+//     value: f64,
+// }
+
 // #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 // pub struct SolanaWallet {
 //     pub resource: String,
 //     pub address: String,
-//     pub balance: f64,
+//     pub balance: Currency,
 //     pub chain: Blockchain,
-
 // }
 
 // #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 // pub struct PolygonWallet {
 //     pub resource: String,
 //     pub address: String,
-//     pub balance: f64,
+//     pub balance: Currency,
 //     pub chain: Blockchain,
-
 // }
 
 // #[derive(Interface)]
 // #[graphql(
 //     field(name = "resource", type = "String"),
 //     field(name = "address", type = "String"),
-//     field(name = "balance", type = "&f64"),
-//     field(name = "chain", type = "&Blockchain"),
+//     field(name = "balance", type = "&Currency"),
+//     field(name = "chain", type = "&Blockchain")
 // )]
-// enum Wallet {
+// pub enum Wallet {
 //     SolanaWallet(SolanaWallet),
 //     PolygonWallet(PolygonWallet),
 // }
 
-// #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
-// pub struct ProjectTreasury {
-//     resource: String,
-//     project: Project!
-//     wallets(limit: Int = 25, offset: Int = 0): [Wallet!]
-//   }
+// // #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+// // pub struct ProjectTreasury {
+// //     resource: String,
+// //     project: Project!
+// //     wallets(limit: Int = 25, offset: Int = 0): [Wallet!]
+// //   }
+
+// impl From<VaultAsset> for Wallet {
+//     fn from(v : VaultAsset) -> Self {
+//          const SOLANA_ASSET_ID: String = "SOL_TEST".to_string();
+//          const POLYGON_ASSET_ID: String = "MATIC_TEST".to_string();
+
+//         match v.id {
+//             SOLANA_ASSET_ID => Wallet::SolanaWallet(SolanaWallet { resource: v.id, address:  v, balance: (), chain: () }),
+//             POLYGON_ASSET_ID => Wallet::PolygonWallet(PolygonWallet { resource: (), address: (), balance: (), chain:)
+
+//         }
+//     }
+// }

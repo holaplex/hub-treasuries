@@ -3,11 +3,14 @@
 use std::sync::Arc;
 
 use async_graphql::{Context, Object, Result};
-use fireblocks::{client::FireblocksClient, objects::vault::VaultAsset};
 use sea_orm::entity::prelude::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+use super::wallets;
+
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
 #[sea_orm(table_name = "treasuries")]
+
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
@@ -16,7 +19,8 @@ pub struct Model {
     pub created_at: DateTime,
 }
 
-#[Object]
+#[Object(name = "Treasury")]
+
 impl Model {
     async fn id(&self) -> &Uuid {
         &self.id
@@ -30,17 +34,15 @@ impl Model {
         &self.created_at
     }
 
-    async fn wallets(&self, ctx: &Context<'_>) -> Result<Vec<VaultAsset>> {
-        let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
+    async fn wallets(&self, ctx: &Context<'_>) -> Result<Vec<wallets::Model>> {
+        let db = &**ctx.data::<Arc<DatabaseConnection>>()?;
 
-        let v = fireblocks.get_vault(self.vault_id.clone()).await?;
+        let wallets = wallets::Entity::find()
+            .filter(wallets::Column::TreasuryId.eq(self.id))
+            .all(db)
+            .await?;
 
-        // let t = wallets::Entity::find()
-        //     .filter(wallets::Column::TreasuryId.eq(self.id))
-        //     .all(db)
-        //     .await?;
-
-        Ok(v.assets)
+        Ok(wallets)
     }
 }
 
