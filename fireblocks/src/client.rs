@@ -8,9 +8,12 @@ use reqwest::{Client as HttpClient, RequestBuilder, Url};
 use serde::Serialize;
 
 use crate::{
-    objects::vault::{
-        CreateVault, CreateVaultAssetResponse, CreateVaultWallet, QueryVaultAccounts, VaultAccount,
-        VaultAccountsPagedResponse, VaultAsset,
+    objects::{
+        transaction::{CreateTransaction, CreateTransactionResponse},
+        vault::{
+            CreateVault, CreateVaultAssetResponse, CreateVaultWallet, QueryVaultAccounts,
+            VaultAccount, VaultAccountsPagedResponse, VaultAsset,
+        },
     },
     signer::RequestSigner,
 };
@@ -169,6 +172,27 @@ impl FireblocksClient {
 
         let mut req = self.http.get(url);
         req = self.authenticate(req, endpoint, ())?;
+
+        let response = req.send().await?.text().await?;
+
+        info!("{:?}", response);
+
+        Ok(serde_json::from_str(&response)?)
+    }
+
+     /// Res
+    ///
+    /// # Errors
+    /// This function fails if ...
+    pub async fn create_transaction(
+        &self,
+        tx: CreateTransaction,
+    ) -> Result<CreateTransactionResponse> {
+        let endpoint = "/v1/transactions".to_string();
+        let url = self.base_url.join(&endpoint)?;
+
+        let mut req = self.http.post(url).json(&tx);
+        req = self.authenticate(req, endpoint, tx)?;
 
         let response = req.send().await?.text().await?;
 
