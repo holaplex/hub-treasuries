@@ -31,11 +31,12 @@ impl Mutation {
         let db = &**ctx.data::<Arc<DatabaseConnection>>()?;
         let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
         let UserID(id) = ctx.data::<UserID>()?;
+        let user_id = id.ok_or_else(|| Error::new("X-USER-ID header not found"))?;
 
         let create_vault = CreateVault {
             name: project_id.to_string(),
             hidden_on_ui: None,
-            customer_ref_id: Some(id.to_string()),
+            customer_ref_id: Some(user_id.to_string()),
             auto_fuel: Some(false),
         };
 
@@ -76,7 +77,7 @@ impl Mutation {
         let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
         let UserID(id) = ctx.data::<UserID>()?;
 
-        let user_id = Uuid::parse_str(id)?;
+        let user_id = id.ok_or_else(|| Error::new("X-USER-ID header not found"))?;
 
         // insert treasury to get the treasury id
 

@@ -93,11 +93,11 @@ impl FireblocksClient {
         &self,
         filters: QueryVaultAccounts,
     ) -> Result<VaultAccountsPagedResponse> {
-        let endpoint = "/v1/vault/accounts_paged".to_string();
-        let url = self.base_url.join(&endpoint)?;
+        let endpoint = "/v1/vault/accounts_paged";
+        let url = self.base_url.join(endpoint)?;
 
         let mut req = self.http.get(url);
-        req = self.authenticate(req, endpoint, filters)?;
+        req = self.authenticate(req, endpoint.to_string(), filters)?;
 
         let response = req.send().await?.text().await?;
 
@@ -180,7 +180,7 @@ impl FireblocksClient {
         Ok(serde_json::from_str(&response)?)
     }
 
-     /// Res
+    /// Res
     ///
     /// # Errors
     /// This function fails if ...
