@@ -1,23 +1,22 @@
 use async_graphql::{Enum, SimpleObject};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use serde_with::skip_serializing_none;
 
 /// <https://docs.fireblocks.com/api/?javascript#create-a-new-transaction>
-#[derive(Debug, Serialize, Deserialize, SimpleObject)]
-#[serde(rename_all = "camelCase")]
 #[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateTransaction {
     pub asset_id: String,
     pub source: TransferPeerPath,
     pub destination: Option<DestinationTransferPeerPath>,
     pub destinations: Option<Vec<TransactionRequestDestination>>,
     pub amount: String,
-    pub treat_as_gross_amount: Option<String>,
+    pub treat_as_gross_amount: Option<bool>,
     pub note: Option<String>,
     pub operation: TransactionOperation,
     pub customer_ref_id: Option<String>,
-    pub extra_parameters: Option<Value>,
+    pub extra_parameters: Option<ExtraParameters>,
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#transactionoperation>
@@ -34,7 +33,7 @@ pub enum TransactionOperation {
     REDEEM_FROM_COMPOUND,
 }
 /// <https://docs.fireblocks.com/api/?javascript#transferpeerpath>
-#[derive(Debug, Serialize, Deserialize, SimpleObject)]
+#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct TransferPeerPath {
     #[serde(rename = "type")]
@@ -43,9 +42,9 @@ pub struct TransferPeerPath {
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#destinationtransferpeerpath>
-#[derive(Debug, Serialize, Deserialize, SimpleObject)]
-#[serde(rename_all = "camelCase")]
 #[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+#[serde(rename_all = "camelCase")]
 pub struct DestinationTransferPeerPath {
     #[serde(rename = "type")]
     pub peer_type: String,
@@ -54,19 +53,20 @@ pub struct DestinationTransferPeerPath {
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#transactionrequestdestination>
-#[derive(Debug, Serialize, Deserialize, SimpleObject)]
-#[serde(rename_all = "camelCase")]
 #[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+#[serde(rename_all = "camelCase")]
+
 pub struct TransactionRequestDestination {
     pub amount: String,
     pub destination: DestinationTransferPeerPath,
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#onetimeaddress>
-
-#[derive(Debug, Serialize, Deserialize, SimpleObject)]
-#[serde(rename_all = "camelCase")]
 #[skip_serializing_none]
+#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+#[serde(rename_all = "camelCase")]
+
 pub struct OneTimeAddress {
     pub address: String,
     pub tag: Option<String>,
@@ -96,9 +96,58 @@ pub enum TransactionStatus {
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#createtransactionresponse>
-#[derive(Debug, Serialize, Deserialize, SimpleObject)]
+#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateTransactionResponse {
     pub id: String,
     pub status: TransactionStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExtraParameters {
+    Content(String),
+    RawMessageData(RawMessageData),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RawMessageData {
+    pub messages: Vec<UnsignedMessage>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnsignedMessage {
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransactionDetails {
+    pub id: String,
+    pub asset_id: String,
+    pub tx_hash: String,
+    pub status: TransactionStatus,
+    pub sub_status: String,
+    pub signed_messages: Vec<SignedMessageResponse>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SignedMessageResponse {
+    pub content: String,
+    pub algorithm: String,
+    pub derivation_path: Vec<usize>,
+    pub signature: SignatureResponse,
+    pub public_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SignatureResponse {
+    pub full_sig: String,
+    pub r: Option<String>,
+    pub s: Option<String>,
+    pub v: Option<u64>,
 }

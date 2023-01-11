@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::{
     objects::{
-        transaction::{CreateTransaction, CreateTransactionResponse},
+        transaction::{CreateTransaction, CreateTransactionResponse, TransactionDetails},
         vault::{
             CreateVault, CreateVaultAssetResponse, CreateVaultWallet, QueryVaultAccounts,
             VaultAccount, VaultAccountsPagedResponse, VaultAsset,
@@ -180,7 +180,25 @@ impl FireblocksClient {
         Ok(serde_json::from_str(&response)?)
     }
 
-     /// Res
+    /// Res
+    ///
+    /// # Errors
+    /// This function fails if ...
+    pub async fn transactions(&self) -> Result<Vec<TransactionDetails>> {
+        let endpoint = "/v1/transactions".to_string();
+        let url = self.base_url.join(&endpoint)?;
+
+        let mut req = self.http.get(url);
+        req = self.authenticate(req, endpoint, ())?;
+
+        let response = req.send().await?.text().await?;
+
+        info!("{:?}", response);
+
+        Ok(serde_json::from_str(&response)?)
+    }
+
+    /// Res
     ///
     /// # Errors
     /// This function fails if ...
@@ -193,6 +211,24 @@ impl FireblocksClient {
 
         let mut req = self.http.post(url).json(&tx);
         req = self.authenticate(req, endpoint, tx)?;
+
+        let response = req.send().await?.text().await?;
+
+        info!("{:?}", response);
+
+        Ok(serde_json::from_str(&response)?)
+    }
+
+    /// Res
+    ///
+    /// # Errors
+    /// This function fails if ...
+    pub async fn transaction(&self, txid: String) -> Result<TransactionDetails> {
+        let endpoint = format!("/v1/transactions/{txid}");
+        let url = self.base_url.join(&endpoint)?;
+
+        let mut req = self.http.get(url);
+        req = self.authenticate(req, endpoint, ())?;
 
         let response = req.send().await?.text().await?;
 

@@ -3,9 +3,20 @@ use std::{fmt, sync::Arc};
 use async_graphql::{self, Context, Enum, Object, Result};
 use fireblocks::{
     client::FireblocksClient,
-    objects::vault::{QueryVaultAccounts, VaultAccount, VaultAccountsPagedResponse, VaultAsset},
+    objects::{
+        transaction::{
+            CreateTransaction, CreateTransactionResponse, ExtraParameters, RawMessageData,
+            TransactionOperation, TransferPeerPath, UnsignedMessage,
+        },
+        vault::{QueryVaultAccounts, VaultAccount, VaultAccountsPagedResponse, VaultAsset},
+    },
 };
+use hex::FromHex;
+use log::debug;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use solana_client::rpc_client::RpcClient;
+use solana_program::message::Message;
+use solana_sdk::{signature::Signature, transaction::Transaction};
 use uuid::Uuid;
 
 use crate::models::project_treasuries;
@@ -95,74 +106,75 @@ impl Query {
 
         Ok(t)
     }
+
+    async fn tx(&self, ctx: &Context<'_>) -> Result<CreateTransactionResponse> {
+        let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
+
+        let from = "AWN3jYp1u5DE9DpCiVdHdd9rc4NL5XVYLGmzKJXwFhaP".parse()?;
+        let to: solana_program::pubkey::Pubkey =
+            "Et8ALhvkqfLekymLYpnuSqKxZkbqHQcQFEeW9LS8MVGu".parse()?;
+        let ins = solana_program::system_instruction::transfer(&from, &to, 1000000000);
+
+        let url = "https://api.devnet.solana.com".to_string();
+
+        let rpc_client = RpcClient::new(url);
+        let blockhash = rpc_client.get_latest_blockhash()?;
+
+        let message = Message::new_with_blockhash(&[ins], Some(&from), &blockhash);
+        let hashed_data = hex::encode(message.serialize());
+
+        let tx = CreateTransaction {
+            asset_id: "SOL_TEST".to_string(),
+            operation: TransactionOperation::RAW,
+            source: TransferPeerPath {
+                peer_type: "VAULT_ACCOUNT".to_string(),
+                id: "6".to_string(),
+            },
+            destination: None,
+            destinations: None,
+            treat_as_gross_amount: None,
+            customer_ref_id: None,
+            amount: "0".to_string(),
+            extra_parameters: Some(ExtraParameters::RawMessageData(RawMessageData {
+                messages: vec![UnsignedMessage {
+                    content: hashed_data,
+                }],
+            })),
+            note: Some("solana transfer instruction ".to_string()),
+        };
+
+        let transaction = fireblocks.create_transaction(tx).await?;
+
+        let mut tx_details = fireblocks.transaction(transaction.id.clone()).await?;
+
+        while tx_details.signed_messages.len() == 0 {
+            tx_details = fireblocks.transaction(transaction.id.clone()).await?;
+        }
+
+        debug!("{:?}", tx_details.signed_messages);
+
+        let full_sig = tx_details.clone().signed_messages[0]
+            .clone()
+            .signature
+            .full_sig;
+
+        // SIGNATURE LEN = 64 bytes
+
+        let signature_decoded = <[u8; 64]>::from_hex(full_sig)?;
+
+        let signature = Signature::new(&signature_decoded);
+
+        debug!("signature {:?}", signature);
+
+        let signed_transaction = Transaction {
+            signatures: vec![signature],
+            message,
+        };
+
+        let res = rpc_client.send_transaction(&signed_transaction);
+
+        debug!("rpc transaction sent response {:?}", res);
+
+        Ok(transaction)
+    }
 }
-
-// #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-// pub enum Blockchain {
-//     Polygon,
-//     Solana,
-// }
-
-// #[derive(Union,Debug, Clone, Serialize, Deserialize,)]
-// pub enum Currency {
-//     Lamports(Lamports),
-//     Matic(Matic),
-// }
-
-// #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
-// pub struct Lamports {
-//     value: u64,
-// }
-
-// #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
-// pub struct Matic {
-//     value: f64,
-// }
-
-// #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
-// pub struct SolanaWallet {
-//     pub resource: String,
-//     pub address: String,
-//     pub balance: Currency,
-//     pub chain: Blockchain,
-// }
-
-// #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
-// pub struct PolygonWallet {
-//     pub resource: String,
-//     pub address: String,
-//     pub balance: Currency,
-//     pub chain: Blockchain,
-// }
-
-// #[derive(Interface)]
-// #[graphql(
-//     field(name = "resource", type = "String"),
-//     field(name = "address", type = "String"),
-//     field(name = "balance", type = "&Currency"),
-//     field(name = "chain", type = "&Blockchain")
-// )]
-// pub enum Wallet {
-//     SolanaWallet(SolanaWallet),
-//     PolygonWallet(PolygonWallet),
-// }
-
-// // #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
-// // pub struct ProjectTreasury {
-// //     resource: String,
-// //     project: Project!
-// //     wallets(limit: Int = 25, offset: Int = 0): [Wallet!]
-// //   }
-
-// impl From<VaultAsset> for Wallet {
-//     fn from(v : VaultAsset) -> Self {
-//          const SOLANA_ASSET_ID: String = "SOL_TEST".to_string();
-//          const POLYGON_ASSET_ID: String = "MATIC_TEST".to_string();
-
-//         match v.id {
-//             SOLANA_ASSET_ID => Wallet::SolanaWallet(SolanaWallet { resource: v.id, address:  v, balance: (), chain: () }),
-//             POLYGON_ASSET_ID => Wallet::PolygonWallet(PolygonWallet { resource: (), address: (), balance: (), chain:)
-
-//         }
-//     }
-// }
