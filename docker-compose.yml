@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15.1
+    container_name: hub_treasuries_db
+    env_file:
+      - .env
+    ports:
+      - 5438:5432
+    volumes: 
+      - hub_treasuries_db:/var/lib/postgresql/data
+volumes:
+  hub_treasuries_db:
+    driver: local
