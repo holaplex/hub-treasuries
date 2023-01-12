@@ -58,7 +58,7 @@ impl Model {
     }
 
     async fn balance(&self, ctx: &Context<'_>) -> Result<Vec<VaultAsset>> {
-        let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
+        let fireblocks = ctx.data::<FireblocksClient>()?;
         let db = &**ctx.data::<Arc<DatabaseConnection>>()?;
 
         let res = treasuries::Entity::find_by_id(self.treasury_id)

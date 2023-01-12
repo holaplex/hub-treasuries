@@ -126,7 +126,7 @@ async fn graphql_handler(
 
 pub struct Context {
     db: Arc<DatabaseConnection>,
-    fireblocks: Arc<FireblocksClient>,
+    fireblocks: FireblocksClient,
 }
 
 impl Context {

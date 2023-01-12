@@ -1,4 +1,4 @@
-use std::{fmt, sync::Arc};
+use std::fmt;
 
 use async_graphql::{self, Context, Enum, Object, Result};
 use fireblocks::{
@@ -46,7 +46,7 @@ impl Query {
         limit: Option<u64>,
         order_by: Option<OrderBy>,
     ) -> Result<VaultAccountsPagedResponse> {
-        let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
+        let fireblocks = ctx.data::<FireblocksClient>()?;
 
         let vaults = fireblocks
             .get_vaults(QueryVaultAccounts {
@@ -67,7 +67,7 @@ impl Query {
     }
 
     async fn vault(&self, ctx: &Context<'_>, vault_id: String) -> Result<VaultAccount> {
-        let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
+        let fireblocks = ctx.data::<FireblocksClient>()?;
 
         let vault = fireblocks.get_vault(vault_id).await?;
 
@@ -75,7 +75,7 @@ impl Query {
     }
 
     async fn vault_assets(&self, ctx: &Context<'_>) -> Result<Vec<VaultAsset>> {
-        let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
+        let fireblocks = ctx.data::<FireblocksClient>()?;
 
         let vault = fireblocks.vault_assets().await?;
 

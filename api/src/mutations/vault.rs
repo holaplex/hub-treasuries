@@ -29,8 +29,9 @@ impl Mutation {
         project_id: String,
     ) -> Result<VaultAccount> {
         let db = &**ctx.data::<Arc<DatabaseConnection>>()?;
-        let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
+        let fireblocks = ctx.data::<FireblocksClient>()?;
         let UserID(id) = ctx.data::<UserID>()?;
+
         let user_id = id.ok_or_else(|| Error::new("X-USER-ID header not found"))?;
 
         let create_vault = CreateVault {
@@ -74,7 +75,7 @@ impl Mutation {
         // Reterive assets endpoint
 
         let db = &**ctx.data::<Arc<DatabaseConnection>>()?;
-        let fireblocks = &**ctx.data::<Arc<FireblocksClient>>()?;
+        let fireblocks = ctx.data::<FireblocksClient>()?;
         let UserID(id) = ctx.data::<UserID>()?;
 
         let user_id = id.ok_or_else(|| Error::new("X-USER-ID header not found"))?;

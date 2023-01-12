@@ -42,8 +42,6 @@ pub mod client;
 pub mod objects;
 pub mod signer;
 
-use std::sync::Arc;
-
 use anyhow::{Context, Result};
 use client::FireblocksClient;
 
@@ -51,8 +49,8 @@ use client::FireblocksClient;
 ///
 /// # Errors
 /// This function fails if ...
-pub fn build() -> Result<Arc<FireblocksClient>> {
+pub fn build() -> Result<FireblocksClient> {
     let client = FireblocksClient::new().context("failed to construct client")?;
 
-    Ok(Arc::new(client))
+    Ok(client)
 }
