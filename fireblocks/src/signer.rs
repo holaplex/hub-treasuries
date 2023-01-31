@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
-use chrono::prelude::*;
+use hub_core::{anyhow, chrono::Utc, serde_json};
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+#[derive(Clone)]
 pub(crate) struct RequestSigner {
     secret: EncodingKey,
     api_key: String,
