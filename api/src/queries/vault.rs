@@ -6,9 +6,9 @@ use fireblocks::{
     Client as FireblocksClient,
 };
 use hub_core::uuid::Uuid;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use crate::entities::project_treasuries;
+use crate::{entities::project_treasuries, AppContext};
 
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum OrderBy {
@@ -87,10 +87,11 @@ impl Query {
         ctx: &Context<'_>,
         project_id: Uuid,
     ) -> Result<Vec<project_treasuries::Model>> {
-        let db = ctx.data::<DatabaseConnection>()?;
+        let AppContext { db, .. } = ctx.data::<AppContext>()?;
+
         let t = project_treasuries::Entity::find()
             .filter(project_treasuries::Column::ProjectId.eq(project_id))
-            .all(db)
+            .all(db.get())
             .await?;
 
         Ok(t)

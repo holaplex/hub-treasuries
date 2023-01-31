@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc};
+use std::str::FromStr;
 
 use async_graphql::{self, Context, Error, Object, Result};
 use entities::prelude::*;
@@ -10,7 +10,7 @@ use sea_orm::{prelude::*, Set};
 
 use crate::{
     entities::{self, project_treasuries, treasuries, wallets},
-    UserID,
+    AppContext, UserID,
 };
 
 #[derive(Default)]
@@ -27,9 +27,9 @@ impl Mutation {
         ctx: &Context<'_>,
         project_id: String,
     ) -> Result<VaultAccount> {
-        let db = &**ctx.data::<Arc<DatabaseConnection>>()?;
+        let AppContext { db, user_id, .. } = ctx.data::<AppContext>()?;
         let fireblocks = ctx.data::<FireblocksClient>()?;
-        let UserID(id) = ctx.data::<UserID>()?;
+        let UserID(id) = user_id;
 
         let user_id = id.ok_or_else(|| Error::new("X-USER-ID header not found"))?;
 
@@ -47,7 +47,7 @@ impl Mutation {
             ..Default::default()
         };
 
-        let treasury: treasuries::Model = treasury.clone().insert(db).await?;
+        let treasury: treasuries::Model = treasury.clone().insert(db.get()).await?;
 
         let project_treasuries_active_model = project_treasuries::ActiveModel {
             project_id: Set(Uuid::parse_str(&project_id)?),
@@ -55,7 +55,7 @@ impl Mutation {
             ..Default::default()
         };
 
-        project_treasuries_active_model.insert(db).await?;
+        project_treasuries_active_model.insert(db.get()).await?;
 
         Ok(vault)
     }
@@ -73,9 +73,9 @@ impl Mutation {
         // AssetID would be enum for polygon/solana
         // Reterive assets endpoint
 
-        let db = &**ctx.data::<Arc<DatabaseConnection>>()?;
+        let AppContext { db, user_id, .. } = ctx.data::<AppContext>()?;
         let fireblocks = ctx.data::<FireblocksClient>()?;
-        let UserID(id) = ctx.data::<UserID>()?;
+        let UserID(id) = user_id;
 
         let user_id = id.ok_or_else(|| Error::new("X-USER-ID header not found"))?;
 
@@ -84,7 +84,7 @@ impl Mutation {
         let treasury_id = Uuid::from_str(&treasury_id)?;
 
         let treasury = Treasuries::find_by_id(treasury_id)
-            .one(db)
+            .one(db.get())
             .await?
             .ok_or_else(|| Error::new("failed to load treasury"))?;
 
@@ -105,7 +105,7 @@ impl Mutation {
             created_by: Set(user_id),
             ..Default::default()
         };
-        active_model.insert(db).await?;
+        active_model.insert(db.get()).await?;
 
         Ok(v)
     }
