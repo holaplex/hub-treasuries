@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use async_graphql::{Context, Object, Result};
+use async_graphql::*;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +10,6 @@ use super::treasuries;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
 #[sea_orm(table_name = "project_treasuries")]
-//#[graphql(concrete(name = "ProjectTreasury", params()))]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub project_id: Uuid,

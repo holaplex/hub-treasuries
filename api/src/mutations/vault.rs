@@ -1,16 +1,15 @@
 use std::{str::FromStr, sync::Arc};
 
 use async_graphql::{self, Context, Error, Object, Result};
+use entities::prelude::*;
 use fireblocks::{
-    client::FireblocksClient,
     objects::vault::{CreateVault, CreateVaultAssetResponse, CreateVaultWallet, VaultAccount},
+    Client as FireblocksClient,
 };
-use models::prelude::*;
 use sea_orm::{prelude::*, Set};
-use uuid::Uuid;
 
 use crate::{
-    models::{self, project_treasuries, treasuries, wallets},
+    entities::{self, project_treasuries, treasuries, wallets},
     UserID,
 };
 

@@ -1,9 +1,9 @@
-#![allow(clippy::module_name_repetitions)]
-
-use anyhow::{Context, Result};
-use clap::{arg, Parser};
+use hub_core::{
+    anyhow::{Context as _, Result},
+    clap, serde_json,
+    tracing::info,
+};
 use jsonwebtoken::EncodingKey;
-use log::info;
 use reqwest::{Client as HttpClient, RequestBuilder, Url};
 use serde::Serialize;
 
@@ -18,34 +18,36 @@ use crate::{
     signer::RequestSigner,
 };
 
-#[derive(Parser)]
+#[derive(clap::Args, Clone, Debug)]
 pub struct Args {
     #[arg(long, env)]
-    fireblocks_endpoint: String,
+    pub fireblocks_endpoint: String,
     #[arg(long, env)]
-    fireblocks_api_key: String,
+    pub fireblocks_api_key: String,
     #[arg(long, env)]
-    secret_path: String,
+    pub secret_path: String,
 }
 
-pub struct FireblocksClient {
+#[allow(missing_debug_implementations)]
+#[derive(Clone)]
+pub struct Client {
     http: HttpClient,
     request_signer: RequestSigner,
     base_url: Url,
     api_key: String,
 }
 
-impl FireblocksClient {
+impl Client {
     /// Res
     ///
     /// # Errors
     /// This function fails if ...
-    pub fn new() -> Result<Self> {
+    pub fn new(args: Args) -> Result<Self> {
         let Args {
             fireblocks_endpoint,
             fireblocks_api_key,
             secret_path,
-        } = Args::parse();
+        } = args;
 
         let http = HttpClient::new();
 

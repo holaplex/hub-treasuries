@@ -2,13 +2,13 @@ use std::fmt;
 
 use async_graphql::{self, Context, Enum, Object, Result};
 use fireblocks::{
-    client::FireblocksClient,
     objects::vault::{QueryVaultAccounts, VaultAccount, VaultAccountsPagedResponse, VaultAsset},
+    Client as FireblocksClient,
 };
+use hub_core::uuid::Uuid;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
-use uuid::Uuid;
 
-use crate::models::project_treasuries;
+use crate::entities::project_treasuries;
 
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
 pub enum OrderBy {

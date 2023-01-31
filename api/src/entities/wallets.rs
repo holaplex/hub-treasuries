@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use async_graphql::{Context, Error, Object, Result};
-use fireblocks::{client::FireblocksClient, objects::vault::VaultAsset};
+use fireblocks::{objects::vault::VaultAsset, Client as FireblocksClient};
 use sea_orm::entity::prelude::*;
 
 use super::treasuries;

@@ -1,7 +1,6 @@
 use async_graphql::{Enum, SimpleObject};
+use hub_core::{serde_json::Value, serde_with::skip_serializing_none};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use serde_with::skip_serializing_none;
 
 /// <https://docs.fireblocks.com/api/?javascript#create-a-new-transaction>
 #[derive(Debug, Serialize, Deserialize, SimpleObject)]
