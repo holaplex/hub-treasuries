@@ -1,12 +1,11 @@
-use async_graphql::*;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::treasuries;
-use crate::AppContext;
-
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize, poem_openapi::Object,
+)]
 #[sea_orm(table_name = "project_treasuries")]
+#[oai(rename = "ProjectTreasury")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub project_id: Uuid,
@@ -15,32 +14,32 @@ pub struct Model {
     pub created_at: DateTime,
 }
 
-#[Object(name = "ProjectTreasury")]
-impl Model {
-    async fn project_id(&self) -> &Uuid {
-        &self.project_id
-    }
+// #[Object(name = "ProjectTreasury")]
+// impl Model {
+//     async fn project_id(&self) -> &Uuid {
+//         &self.project_id
+//     }
 
-    async fn treasury_id(&self) -> &Uuid {
-        &self.treasury_id
-    }
+//     async fn treasury_id(&self) -> &Uuid {
+//         &self.treasury_id
+//     }
 
-    async fn created_at(&self) -> &DateTime {
-        &self.created_at
-    }
+//     async fn created_at(&self) -> &DateTime {
+//         &self.created_at
+//     }
 
-    async fn treasury(&self, ctx: &Context<'_>) -> Result<Option<treasuries::Model>> {
-        let AppContext { db, .. } = ctx.data::<AppContext>()?;
-        let t = treasuries::Entity::find_by_id(self.treasury_id)
-            .one(db.get())
-            .await?;
+//     async fn treasury(&self, ctx: &Context<'_>) -> Result<Option<treasuries::Model>> {
+//         let AppContext { db, .. } = ctx.data::<AppContext>()?;
+//         let t = treasuries::Entity::find_by_id(self.treasury_id)
+//             .one(db.get())
+//             .await?;
 
-        // let fireblocks = ctx.data::<FireblocksClient>()?;
-        // let vault = fireblocks.get_vault(vault_id).await?;
+//         // let fireblocks = ctx.data::<FireblocksClient>()?;
+//         // let vault = fireblocks.get_vault(vault_id).await?;
 
-        Ok(t)
-    }
-}
+//         Ok(t)
+//     }
+// }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {

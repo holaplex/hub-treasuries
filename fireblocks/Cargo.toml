@@ -20,7 +20,7 @@ hex = "~0.4.0"
 serde = { version = "1.0.91", features = ["derive"] }
 jsonwebtoken = "8.2.0"
 reqwest = { version = "0.11.14", features = ["json"] }
-async-graphql = { version = "5.0.4", features = ["chrono", "uuid", "log", "dataloader", "apollo_tracing"] }
+poem-openapi = { version = "2.0.23", features = ["swagger-ui", "uuid", "chrono"] }
 
 [dependencies.hub-core]
 package = "holaplex-hub-core"

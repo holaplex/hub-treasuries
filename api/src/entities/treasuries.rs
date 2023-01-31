@@ -1,12 +1,11 @@
-use async_graphql::*;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::wallets;
-use crate::AppContext;
-
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
+#[derive(
+    Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize, poem_openapi::Object,
+)]
 #[sea_orm(table_name = "treasuries")]
+#[oai(rename = "Treasury")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
@@ -15,32 +14,32 @@ pub struct Model {
     pub created_at: DateTime,
 }
 
-#[Object(name = "Treasury")]
+// #[Object(name = "Treasury")]
 
-impl Model {
-    async fn id(&self) -> &Uuid {
-        &self.id
-    }
+// impl Model {
+//     async fn id(&self) -> &Uuid {
+//         &self.id
+//     }
 
-    async fn vault_id(&self) -> &str {
-        &self.vault_id
-    }
+//     async fn vault_id(&self) -> &str {
+//         &self.vault_id
+//     }
 
-    async fn created_at(&self) -> &DateTime {
-        &self.created_at
-    }
+//     async fn created_at(&self) -> &DateTime {
+//         &self.created_at
+//     }
 
-    async fn wallets(&self, ctx: &Context<'_>) -> Result<Vec<wallets::Model>> {
-        let AppContext { db, .. } = ctx.data::<AppContext>()?;
+//     async fn wallets(&self, ctx: &Context<'_>) -> Result<Vec<wallets::Model>> {
+//         let AppContext { db, .. } = ctx.data::<AppContext>()?;
 
-        let wallets = wallets::Entity::find()
-            .filter(wallets::Column::TreasuryId.eq(self.id))
-            .all(db.get())
-            .await?;
+//         let wallets = wallets::Entity::find()
+//             .filter(wallets::Column::TreasuryId.eq(self.id))
+//             .all(db.get())
+//             .await?;
 
-        Ok(wallets)
-    }
-}
+//         Ok(wallets)
+//     }
+// }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
