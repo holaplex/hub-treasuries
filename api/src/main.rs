@@ -24,7 +24,7 @@ pub fn main() {
 
             let fireblocks = fireblocks::Client::new(fireblocks)?;
             let api_service = OpenApiService::new(OrgsApi, "Orgs", "0.1.0")
-                .server(format!("http://localhost:{port}/api"));
+                .server(format!("http://localhost:{port}/v1"));
             let ui = api_service.swagger_ui();
             let spec = api_service.spec_endpoint();
             let state = AppState::new(connection, fireblocks);

@@ -4,12 +4,16 @@ use fireblocks::objects::vault::{
 };
 use hub_core::{prelude::*, uuid::Uuid};
 use poem::{web::Data, Result};
-use poem_openapi::{param::Path, payload::Json, Object, OpenApi};
+use poem_openapi::{
+    param::{Header, Path},
+    payload::Json,
+    Object, OpenApi,
+};
 use sea_orm::{prelude::*, Set};
 
 use crate::{
     entities::{prelude::*, project_treasuries, treasuries, wallets},
-    AppState, UserID,
+    AppState,
 };
 
 pub struct OrgsApi;
@@ -20,18 +24,16 @@ impl OrgsApi {
     async fn create_vault(
         &self,
         state: Data<&AppState>,
-        user_id: UserID,
-        project_id: Json<String>,
+        #[oai(name = "X-USER-ID")] user_id: Header<Uuid>,
+        req: Json<CreateVaultRequest>,
     ) -> Result<Json<VaultAccount>> {
-        let UserID(id) = user_id;
+        let user_id = user_id.0;
         let Data(state) = state;
         let conn = state.connection.get();
         let fireblocks = state.fireblocks.clone();
 
-        let user_id = id.context("X-USER-ID header not found")?;
-
         let create_vault = CreateVault {
-            name: project_id.to_string(),
+            name: req.project_id.to_string(),
             hidden_on_ui: None,
             customer_ref_id: Some(user_id.to_string()),
             auto_fuel: Some(false),
@@ -52,7 +54,7 @@ impl OrgsApi {
 
         let project_treasuries_active_model = project_treasuries::ActiveModel {
             project_id: Set(
-                Uuid::parse_str(&project_id).context("failed to parse project id to Uuid")?
+                Uuid::parse_str(&req.project_id).context("failed to parse project id to Uuid")?
             ),
             treasury_id: Set(treasury.id),
             ..Default::default()
@@ -70,24 +72,21 @@ impl OrgsApi {
     async fn create_treasury_wallet(
         &self,
         state: Data<&AppState>,
-        user_id: UserID,
-        treasury_id: String,
-        asset_id: String,
+        #[oai(name = "X-USER-ID")] user_id: Header<Uuid>,
+        req: Json<CreateTreasuryWalletRequest>,
     ) -> Result<Json<CreateVaultAssetResponse>> {
-        let UserID(id) = user_id;
+        let user_id = user_id.0;
         let Data(state) = state;
         let conn = state.connection.get();
         let fireblocks = state.fireblocks.clone();
-
-        let user_id = id.context("X-USER-ID header not found")?;
 
         // AssetID would be enum for polygon/solana
         // Reterive assets endpoint
 
         // insert treasury to get the treasury id
 
-        let treasury_id =
-            Uuid::from_str(&treasury_id).context("failed to parse treasury_id to Uuid")?;
+        let treasury_id = Uuid::from_str(&req.treasury_id.clone())
+            .context("failed to parse treasury_id to Uuid")?;
 
         let treasury = Treasuries::find_by_id(treasury_id)
             .one(conn)
@@ -96,9 +95,13 @@ impl OrgsApi {
             .context("treasury not found in db")?;
 
         let vault_asset = fireblocks
-            .create_vault_wallet(treasury.vault_id.clone(), asset_id, CreateVaultWallet {
-                eos_account_name: None,
-            })
+            .create_vault_wallet(
+                treasury.vault_id.clone(),
+                req.asset_id.clone(),
+                CreateVaultWallet {
+                    eos_account_name: None,
+                },
+            )
             .await?;
 
         let v = vault_asset.clone();
@@ -120,11 +123,11 @@ impl OrgsApi {
         Ok(Json(v))
     }
 
-    #[oai(path = "/vaults", method = "get")]
+    #[oai(path = "/vaults", method = "post")]
     async fn list_vaults(
         &self,
         state: Data<&AppState>,
-        // req: Json<ListVaultsRequest>,
+        req: Json<ListVaultsRequest>,
     ) -> Result<Json<VaultAccountsPagedResponse>> {
         let fireblocks = state.fireblocks.clone();
 
@@ -133,9 +136,9 @@ impl OrgsApi {
                 name_prefix: None,
                 name_suffix: None,
                 min_amount_threshold: None,
-                asset_id: None,
-                order_by: OrderBy::default().to_string(),
-                limit: 500,
+                asset_id: req.asset_id,
+                order_by: req.order_by.unwrap_or_default().to_string(),
+                limit: req.limit.unwrap_or(500),
                 before: None,
                 after: None,
                 max_bip44_address_index_used: 966,
@@ -165,8 +168,6 @@ impl OrgsApi {
         let fireblocks = state.fireblocks.clone();
 
         let vault = fireblocks.vault_assets().await?;
-
-        debug!("{:?}", vault);
 
         Ok(Json(vault))
     }
@@ -259,4 +260,15 @@ struct FireblockWallet {
     #[oai(flatten = true)]
     wallet: wallets::Model,
     balance: VaultAsset,
+}
+
+#[derive(Object)]
+pub struct CreateVaultRequest {
+    project_id: String,
+}
+
+#[derive(Object, Clone)]
+pub struct CreateTreasuryWalletRequest {
+    treasury_id: String,
+    asset_id: String,
 }

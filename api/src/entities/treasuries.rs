@@ -14,33 +14,6 @@ pub struct Model {
     pub created_at: DateTime,
 }
 
-// #[Object(name = "Treasury")]
-
-// impl Model {
-//     async fn id(&self) -> &Uuid {
-//         &self.id
-//     }
-
-//     async fn vault_id(&self) -> &str {
-//         &self.vault_id
-//     }
-
-//     async fn created_at(&self) -> &DateTime {
-//         &self.created_at
-//     }
-
-//     async fn wallets(&self, ctx: &Context<'_>) -> Result<Vec<wallets::Model>> {
-//         let AppContext { db, .. } = ctx.data::<AppContext>()?;
-
-//         let wallets = wallets::Entity::find()
-//             .filter(wallets::Column::TreasuryId.eq(self.id))
-//             .all(db.get())
-//             .await?;
-
-//         Ok(wallets)
-//     }
-// }
-
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(has_one = "super::project_treasuries::Entity")]

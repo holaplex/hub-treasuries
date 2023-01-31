@@ -8,39 +8,7 @@ pub mod entities;
 pub mod handlers;
 use db::Connection;
 use fireblocks::Client as FireblocksClient;
-use hub_core::{
-    anyhow::{Error, Result},
-    clap,
-    prelude::*,
-    uuid::Uuid,
-};
-use poem::{async_trait, FromRequest, Request, RequestBody};
-
-#[derive(Debug, Clone, Copy)]
-pub struct UserID(Option<Uuid>);
-
-impl TryFrom<&str> for UserID {
-    type Error = Error;
-
-    fn try_from(value: &str) -> Result<Self> {
-        let id = Uuid::from_str(value)?;
-
-        Ok(Self(Some(id)))
-    }
-}
-
-#[async_trait]
-impl<'a> FromRequest<'a> for UserID {
-    async fn from_request(req: &'a Request, _body: &mut RequestBody) -> poem::Result<Self> {
-        let id = req
-            .headers()
-            .get("X-USER-ID")
-            .and_then(|value| value.to_str().ok())
-            .map_or(Ok(Self(None)), Self::try_from)?;
-
-        Ok(id)
-    }
-}
+use hub_core::{clap, prelude::*};
 
 #[derive(Debug, clap::Args)]
 #[command(version, author, about)]
@@ -68,17 +36,5 @@ impl AppState {
             connection,
             fireblocks,
         }
-    }
-}
-
-pub struct AppContext {
-    pub db: Connection,
-    pub user_id: UserID,
-}
-
-impl AppContext {
-    #[must_use]
-    pub fn new(db: Connection, user_id: UserID) -> Self {
-        Self { db, user_id }
     }
 }

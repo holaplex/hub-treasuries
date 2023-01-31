@@ -14,33 +14,6 @@ pub struct Model {
     pub created_at: DateTime,
 }
 
-// #[Object(name = "ProjectTreasury")]
-// impl Model {
-//     async fn project_id(&self) -> &Uuid {
-//         &self.project_id
-//     }
-
-//     async fn treasury_id(&self) -> &Uuid {
-//         &self.treasury_id
-//     }
-
-//     async fn created_at(&self) -> &DateTime {
-//         &self.created_at
-//     }
-
-//     async fn treasury(&self, ctx: &Context<'_>) -> Result<Option<treasuries::Model>> {
-//         let AppContext { db, .. } = ctx.data::<AppContext>()?;
-//         let t = treasuries::Entity::find_by_id(self.treasury_id)
-//             .one(db.get())
-//             .await?;
-
-//         // let fireblocks = ctx.data::<FireblocksClient>()?;
-//         // let vault = fireblocks.get_vault(vault_id).await?;
-
-//         Ok(t)
-//     }
-// }
-
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
