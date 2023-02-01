@@ -16,10 +16,10 @@ use crate::{
     AppState,
 };
 
-pub struct OrgsApi;
+pub struct TreasuryApi;
 
 #[OpenApi]
-impl OrgsApi {
+impl TreasuryApi {
     #[oai(path = "/treasury/create", method = "post")]
     async fn create_vault(
         &self,

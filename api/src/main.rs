@@ -1,6 +1,6 @@
 //!
 
-use holaplex_hub_treasuries::{api::OrgsApi, db::Connection, handlers::health, AppState, Args};
+use holaplex_hub_treasuries::{api::TreasuryApi, db::Connection, handlers::health, AppState, Args};
 use hub_core::anyhow::Context as AnyhowContext;
 use poem::{get, listener::TcpListener, middleware::AddData, EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
@@ -23,7 +23,7 @@ pub fn main() {
                 .context("failed to get database connection")?;
 
             let fireblocks = fireblocks::Client::new(fireblocks)?;
-            let api_service = OpenApiService::new(OrgsApi, "Orgs", "0.1.0")
+            let api_service = OpenApiService::new(TreasuryApi, "HubTreasury", "0.1.0")
                 .server(format!("http://localhost:{port}/v1"));
             let ui = api_service.swagger_ui();
             let spec = api_service.spec_endpoint();
