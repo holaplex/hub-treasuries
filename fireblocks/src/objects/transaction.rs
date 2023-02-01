@@ -1,5 +1,5 @@
 use async_graphql::{Enum, SimpleObject};
-use hub_core::{serde_json::Value, serde_with::skip_serializing_none};
+use hub_core::serde_with::skip_serializing_none;
 use serde::{Deserialize, Serialize};
 
 /// <https://docs.fireblocks.com/api/?javascript#create-a-new-transaction>
@@ -12,11 +12,11 @@ pub struct CreateTransaction {
     pub destination: Option<DestinationTransferPeerPath>,
     pub destinations: Option<Vec<TransactionRequestDestination>>,
     pub amount: String,
-    pub treat_as_gross_amount: Option<String>,
+    pub treat_as_gross_amount: Option<bool>,
     pub note: Option<String>,
     pub operation: TransactionOperation,
     pub customer_ref_id: Option<String>,
-    pub extra_parameters: Option<Value>,
+    pub extra_parameters: Option<RawMessageData>,
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#transactionoperation>
@@ -95,9 +95,51 @@ pub enum TransactionStatus {
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#createtransactionresponse>
-#[derive(Debug, Serialize, Deserialize, SimpleObject)]
+#[derive(Debug, Serialize, Clone, Deserialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateTransactionResponse {
     pub id: String,
     pub status: TransactionStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+#[serde(rename_all = "camelCase")]
+pub struct RawMessageData {
+    pub messages: Vec<UnsignedMessage>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+#[serde(rename_all = "camelCase")]
+pub struct UnsignedMessage {
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+#[serde(rename_all = "camelCase")]
+pub struct TransactionDetails {
+    pub id: String,
+    pub asset_id: String,
+    pub tx_hash: String,
+    pub status: TransactionStatus,
+    pub sub_status: String,
+    pub signed_messages: Vec<SignedMessageResponse>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+#[serde(rename_all = "camelCase")]
+pub struct SignedMessageResponse {
+    pub content: String,
+    pub algorithm: String,
+    pub derivation_path: Vec<usize>,
+    pub signature: SignatureResponse,
+    pub public_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+#[serde(rename_all = "camelCase")]
+pub struct SignatureResponse {
+    pub full_sig: String,
+    pub r: Option<String>,
+    pub s: Option<String>,
+    pub v: Option<u64>,
 }
