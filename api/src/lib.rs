@@ -5,15 +5,16 @@
 pub mod api;
 pub mod db;
 pub mod entities;
+pub mod events;
 pub mod handlers;
 use db::Connection;
 use fireblocks::Client as FireblocksClient;
-use hub_core::{clap, prelude::*};
+use hub_core::{clap, consumer::RecvError, prelude::*};
 
 #[derive(Debug, clap::Args)]
 #[command(version, author, about)]
 pub struct Args {
-    #[arg(short, long, env, default_value_t = 3002)]
+    #[arg(short, long, env, default_value_t = 3007)]
     pub port: u16,
 
     #[command(flatten)]
@@ -35,6 +36,36 @@ impl AppState {
         Self {
             connection,
             fireblocks,
+        }
+    }
+}
+
+mod proto {
+    include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
+}
+
+#[derive(Debug)]
+pub enum Services {
+    Org(proto::Key, proto::Event),
+}
+
+impl hub_core::consumer::MessageGroup for Services {
+    const REQUESTED_TOPICS: &'static [&'static str] = &["hub-orgs"];
+
+    fn from_message<M: hub_core::consumer::Message>(msg: &M) -> Result<Self, RecvError> {
+        let topic = msg.topic();
+        let key = msg.key().ok_or(RecvError::MissingKey)?;
+        let val = msg.payload().ok_or(RecvError::MissingPayload)?;
+        info!(topic, ?key, ?val);
+
+        match topic {
+            "hub-orgs" => {
+                let key = proto::Key::decode(key)?;
+                let val = proto::Event::decode(val)?;
+
+                Ok(Services::Org(key, val))
+            },
+            t => Err(RecvError::BadTopic(t.into())),
         }
     }
 }

@@ -56,12 +56,12 @@ pub struct VaultAccount {
 #[serde(rename_all = "camelCase")]
 pub struct VaultAsset {
     pub id: String,
-    pub total: f64,
-    pub pending: u64,
-    pub locked_amount: u64,
-    pub staked: Option<u64>,
-    pub available: f64,
-    pub frozen: u64,
+    pub total: String,
+    pub pending: String,
+    pub locked_amount: String,
+    pub staked: Option<String>,
+    pub available: String,
+    pub frozen: String,
     #[serde(rename = "maxBip44AddressIndexUsed")]
     pub max_bip44_address_index_used: Option<u64>,
     #[serde(rename = "maxBip44ChangeAddressIndexUsed")]

@@ -128,7 +128,7 @@ impl Client {
         let endpoint = "/v1/vault/accounts".to_string();
         let url = self.base_url.join(&endpoint)?;
 
-        let mut req = self.http.post(url);
+        let mut req = self.http.post(url).json(&params);
         req = self.authenticate(req, endpoint, params)?;
 
         let response = req.send().await?.text().await?;
