@@ -1,5 +1,5 @@
 use fireblocks::objects::vault::{
-    CreateVault, CreateVaultAssetResponse, CreateVaultWallet, QueryVaultAccounts, VaultAccount,
+    CreateVaultAssetResponse, CreateVaultWallet, QueryVaultAccounts, VaultAccount,
     VaultAccountsPagedResponse, VaultAsset,
 };
 use hub_core::{prelude::*, uuid::Uuid};
@@ -12,7 +12,7 @@ use poem_openapi::{
 use sea_orm::{prelude::*, Set};
 
 use crate::{
-    entities::{prelude::*, project_treasuries, treasuries, wallets},
+    entities::{prelude::*, treasuries, wallets},
     AppState,
 };
 
@@ -20,63 +20,18 @@ pub struct TreasuryApi;
 
 #[OpenApi]
 impl TreasuryApi {
-    #[oai(path = "/treasury/create", method = "post")]
-    async fn create_vault(
-        &self,
-        state: Data<&AppState>,
-        #[oai(name = "X-USER-ID")] user_id: Header<Uuid>,
-        req: Json<CreateVaultRequest>,
-    ) -> Result<Json<VaultAccount>> {
-        let user_id = user_id.0;
-        let Data(state) = state;
-        let conn = state.connection.get();
-        let fireblocks = state.fireblocks.clone();
-
-        let create_vault = CreateVault {
-            name: req.project_id.to_string(),
-            hidden_on_ui: None,
-            customer_ref_id: Some(user_id.to_string()),
-            auto_fuel: Some(false),
-        };
-
-        let vault = fireblocks.create_vault(create_vault).await?;
-
-        let treasury = treasuries::ActiveModel {
-            vault_id: Set(vault.id.clone()),
-            ..Default::default()
-        };
-
-        let treasury: treasuries::Model = treasury
-            .clone()
-            .insert(conn)
-            .await
-            .context("failed to get treasury record from db")?;
-
-        let project_treasuries_active_model = project_treasuries::ActiveModel {
-            project_id: Set(
-                Uuid::parse_str(&req.project_id).context("failed to parse project id to Uuid")?
-            ),
-            treasury_id: Set(treasury.id),
-            ..Default::default()
-        };
-
-        project_treasuries_active_model
-            .insert(conn)
-            .await
-            .context("failed to insert project treasuries")?;
-
-        Ok(Json(vault))
-    }
-
-    #[oai(path = "/treasury/wallet/create", method = "post")]
+    #[oai(path = "/treasuries/{treasury}/wallets", method = "post")]
     async fn create_treasury_wallet(
         &self,
         state: Data<&AppState>,
         #[oai(name = "X-USER-ID")] user_id: Header<Uuid>,
+        treasury: Path<Uuid>,
         req: Json<CreateTreasuryWalletRequest>,
     ) -> Result<Json<CreateVaultAssetResponse>> {
-        let user_id = user_id.0;
+        let Header(user_id) = user_id;
         let Data(state) = state;
+        let Path(treasury_id) = treasury;
+
         let conn = state.connection.get();
         let fireblocks = state.fireblocks.clone();
 
@@ -84,9 +39,6 @@ impl TreasuryApi {
         // Reterive assets endpoint
 
         // insert treasury to get the treasury id
-
-        let treasury_id = Uuid::from_str(&req.treasury_id.clone())
-            .context("failed to parse treasury_id to Uuid")?;
 
         let treasury = Treasuries::find_by_id(treasury_id)
             .one(conn)
@@ -150,20 +102,20 @@ impl TreasuryApi {
         Ok(Json(vaults))
     }
 
-    #[oai(path = "/vault/:vault_id", method = "get")]
+    #[oai(path = "/vaults/{vault}", method = "get")]
     async fn get_vault(
         &self,
         state: Data<&AppState>,
-        vault_id: Path<String>,
+        vault: Path<String>,
     ) -> Result<Json<VaultAccount>> {
         let fireblocks = state.fireblocks.clone();
-
-        let vault = fireblocks.get_vault(vault_id.0).await?;
+        let Path(vault_id) = vault;
+        let vault = fireblocks.get_vault(vault_id).await?;
 
         Ok(Json(vault))
     }
 
-    #[oai(path = "/vault/assets", method = "get")]
+    #[oai(path = "/assets", method = "get")]
     async fn list_vault_assets(&self, state: Data<&AppState>) -> Result<Json<Vec<VaultAsset>>> {
         let fireblocks = state.fireblocks.clone();
 
@@ -172,23 +124,17 @@ impl TreasuryApi {
         Ok(Json(vault))
     }
 
-    #[oai(path = "/treasury/:project_id", method = "get")]
-    async fn project(
+    #[oai(path = "/treasuries/{treasury}", method = "get")]
+    async fn get_treasury(
         &self,
         state: Data<&AppState>,
-        project_id: Path<String>,
-    ) -> Result<Json<ProjectTreasuryResponse>> {
+        treasury: Path<Uuid>,
+    ) -> Result<Json<TreasuryResponse>> {
         let db = state.connection.get();
         let fireblocks = state.fireblocks.clone();
+        let Path(treasury) = treasury;
 
-        let pt = project_treasuries::Entity::find()
-            .filter(project_treasuries::Column::ProjectId.eq(project_id.0))
-            .one(db)
-            .await
-            .context("failed to load project treasuries")?
-            .context("project treasury not found")?;
-
-        let t = treasuries::Entity::find_by_id(pt.treasury_id)
+        let t = treasuries::Entity::find_by_id(treasury)
             .one(db)
             .await
             .context("failed to load project treasuries")?
@@ -213,8 +159,7 @@ impl TreasuryApi {
             });
         }
 
-        let res = ProjectTreasuryResponse {
-            project_treasury: pt,
+        let res = TreasuryResponse {
             treasury: t,
             wallets,
         };
@@ -248,9 +193,7 @@ pub struct ListVaultsRequest {
 }
 
 #[derive(Object, Debug)]
-struct ProjectTreasuryResponse {
-    #[oai(flatten = true)]
-    project_treasury: project_treasuries::Model,
+struct TreasuryResponse {
     treasury: treasuries::Model,
     wallets: Vec<FireblockWallet>,
 }
@@ -269,6 +212,5 @@ pub struct CreateVaultRequest {
 
 #[derive(Object, Clone)]
 pub struct CreateTreasuryWalletRequest {
-    treasury_id: String,
     asset_id: String,
 }
