@@ -1,1 +1,3 @@
 /target
+.env.local
+secret.key

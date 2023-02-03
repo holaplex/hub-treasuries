@@ -1,9 +1,8 @@
-use async_graphql::{Enum, SimpleObject};
 use hub_core::{serde_json::Value, serde_with::skip_serializing_none};
 use serde::{Deserialize, Serialize};
 
 /// <https://docs.fireblocks.com/api/?javascript#create-a-new-transaction>
-#[derive(Debug, Serialize, Deserialize, SimpleObject)]
+#[derive(Debug, Serialize, Deserialize, poem_openapi::Object)]
 #[serde(rename_all = "camelCase")]
 #[skip_serializing_none]
 pub struct CreateTransaction {
@@ -21,7 +20,7 @@ pub struct CreateTransaction {
 
 /// <https://docs.fireblocks.com/api/?javascript#transactionoperation>
 #[allow(non_camel_case_types)]
-#[derive(Enum, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Debug, poem_openapi::Enum)]
 #[allow(clippy::upper_case_acronyms)]
 pub enum TransactionOperation {
     TRANSFER,
@@ -33,7 +32,7 @@ pub enum TransactionOperation {
     REDEEM_FROM_COMPOUND,
 }
 /// <https://docs.fireblocks.com/api/?javascript#transferpeerpath>
-#[derive(Debug, Serialize, Deserialize, SimpleObject)]
+#[derive(Debug, Serialize, Deserialize, poem_openapi::Object)]
 #[serde(rename_all = "camelCase")]
 pub struct TransferPeerPath {
     #[serde(rename = "type")]
@@ -42,7 +41,7 @@ pub struct TransferPeerPath {
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#destinationtransferpeerpath>
-#[derive(Debug, Serialize, Deserialize, SimpleObject)]
+#[derive(Debug, Serialize, Deserialize, poem_openapi::Object)]
 #[serde(rename_all = "camelCase")]
 #[skip_serializing_none]
 pub struct DestinationTransferPeerPath {
@@ -53,7 +52,7 @@ pub struct DestinationTransferPeerPath {
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#transactionrequestdestination>
-#[derive(Debug, Serialize, Deserialize, SimpleObject)]
+#[derive(Debug, Serialize, Deserialize, poem_openapi::Object)]
 #[serde(rename_all = "camelCase")]
 #[skip_serializing_none]
 pub struct TransactionRequestDestination {
@@ -63,7 +62,7 @@ pub struct TransactionRequestDestination {
 
 /// <https://docs.fireblocks.com/api/?javascript#onetimeaddress>
 
-#[derive(Debug, Serialize, Deserialize, SimpleObject)]
+#[derive(Debug, Serialize, Deserialize, poem_openapi::Object)]
 #[serde(rename_all = "camelCase")]
 #[skip_serializing_none]
 pub struct OneTimeAddress {
@@ -74,7 +73,7 @@ pub struct OneTimeAddress {
 /// <https://docs.fireblocks.com/api/?javascript#transactionstatus>
 #[allow(non_camel_case_types)]
 #[allow(clippy::upper_case_acronyms)]
-#[derive(Enum, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Debug, poem_openapi::Enum)]
 pub enum TransactionStatus {
     SUBMITTED,
     QUEUED,
@@ -95,7 +94,7 @@ pub enum TransactionStatus {
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#createtransactionresponse>
-#[derive(Debug, Serialize, Deserialize, SimpleObject)]
+#[derive(Debug, Serialize, Deserialize, poem_openapi::Object)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateTransactionResponse {
     pub id: String,

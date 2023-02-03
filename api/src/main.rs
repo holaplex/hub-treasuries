@@ -1,13 +1,9 @@
 //!
 
-use holaplex_treasury::{
-    build_schema,
-    db::Connection,
-    handlers::{graphql_handler, health, playground},
-    AppState, Args,
-};
+use holaplex_hub_treasuries::{api::TreasuryApi, db::Connection, handlers::health, AppState, Args};
 use hub_core::anyhow::Context as AnyhowContext;
-use poem::{get, listener::TcpListener, middleware::AddData, post, EndpointExt, Route, Server};
+use poem::{get, listener::TcpListener, middleware::AddData, EndpointExt, Route, Server};
+use poem_openapi::OpenApiService;
 
 pub fn main() {
     let opts = hub_core::StartConfig {
@@ -26,16 +22,19 @@ pub fn main() {
                 .await
                 .context("failed to get database connection")?;
 
-            let schema = build_schema();
             let fireblocks = fireblocks::Client::new(fireblocks)?;
-
-            let state = AppState::new(schema, connection, fireblocks);
+            let api_service = OpenApiService::new(TreasuryApi, "HubTreasury", "0.1.0")
+                .server(format!("http://localhost:{port}/v1"));
+            let ui = api_service.swagger_ui();
+            let spec = api_service.spec_endpoint();
+            let state = AppState::new(connection, fireblocks);
 
             Server::new(TcpListener::bind(format!("0.0.0.0:{port}")))
                 .run(
                     Route::new()
-                        .at("/graphql", post(graphql_handler).with(AddData::new(state)))
-                        .at("/playground", get(playground))
+                        .nest("/v1", api_service.with(AddData::new(state)))
+                        .nest("/", ui)
+                        .at("/spec", spec)
                         .at("/health", get(health)),
                 )
                 .await
