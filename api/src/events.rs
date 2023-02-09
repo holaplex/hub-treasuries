@@ -48,6 +48,14 @@ pub async fn process(
 
             None => Ok(()),
         },
+        Services::Drops(k, e) => match e.event {
+            // match topic messages
+            Some(drop_events::Event::MintEditionTransaction(t)) => {
+                mint_edition(k, t, db, fireblocks, rpc).await
+            },
+
+            None => Ok(()),
+        },
     }
 }
 
