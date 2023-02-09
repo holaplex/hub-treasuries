@@ -12,6 +12,7 @@ pub struct Model {
     #[sea_orm(unique)]
     pub vault_id: String,
     pub created_at: DateTime,
+    pub organization_id: Uuid,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

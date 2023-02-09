@@ -25,10 +25,12 @@ impl TreasuryApi {
         &self,
         state: Data<&AppState>,
         #[oai(name = "X-USER-ID")] user_id: Header<Uuid>,
+        #[oai(name = "X-ORGANIZATION-ID")] organization_id: Header<Uuid>,
         treasury: Path<Uuid>,
         req: Json<CreateTreasuryWalletRequest>,
     ) -> Result<Json<CreateVaultAssetResponse>> {
         let Header(user_id) = user_id;
+        let Header(organization_id) = organization_id;
         let Data(state) = state;
         let Path(treasury_id) = treasury;
 
@@ -45,6 +47,10 @@ impl TreasuryApi {
             .await
             .context("failed to load treasury record from db")?
             .context("treasury not found in db")?;
+
+        if treasury.organization_id != organization_id {
+            return Err(anyhow!("invalid organization id provided").into());
+        }
 
         let vault_asset = fireblocks
             .create_vault_wallet(
@@ -67,6 +73,7 @@ impl TreasuryApi {
             created_by: Set(user_id),
             ..Default::default()
         };
+
         active_model
             .insert(conn)
             .await
@@ -129,16 +136,22 @@ impl TreasuryApi {
         &self,
         state: Data<&AppState>,
         treasury: Path<Uuid>,
+        #[oai(name = "X-ORGANIZATION-ID")] organization_id: Header<Uuid>,
     ) -> Result<Json<TreasuryResponse>> {
         let db = state.connection.get();
         let fireblocks = state.fireblocks.clone();
         let Path(treasury) = treasury;
+        let Header(organization_id) = organization_id;
 
         let t = treasuries::Entity::find_by_id(treasury)
             .one(db)
             .await
             .context("failed to load project treasuries")?
             .context("project treasury not found in db")?;
+
+        if t.organization_id != organization_id {
+            return Err(anyhow!("invalid organization id provided").into());
+        }
 
         let db_wallets = wallets::Entity::find()
             .filter(wallets::Column::TreasuryId.eq(t.id))

@@ -15,9 +15,7 @@ pub async fn process(msg: Services, db: Connection, fireblocks: fireblocks::Clie
         Services::Org(k, e) => match e.event_payload {
             // match topic messages
             Some(EventPayload::ProjectCreated(p)) => create_treasury(k, p, db, fireblocks).await,
-            Some(_) => Ok(()),
-
-            None => Ok(()),
+            Some(_) | None => Ok(()),
         },
     }
 }
@@ -36,9 +34,11 @@ pub async fn create_treasury(
     };
 
     let vault = fireblocks.create_vault(create_vault).await?;
+    let organization_id = Uuid::from_str(&project.organization_id)?;
 
     let treasury = treasuries::ActiveModel {
         vault_id: Set(vault.id.clone()),
+        organization_id: Set(organization_id),
         ..Default::default()
     };
 
