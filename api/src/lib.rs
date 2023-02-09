@@ -10,12 +10,16 @@ pub mod handlers;
 use db::Connection;
 use fireblocks::Client as FireblocksClient;
 use hub_core::{clap, consumer::RecvError, prelude::*};
+use solana_client::rpc_client::RpcClient;
 
 #[derive(Debug, clap::Args)]
 #[command(version, author, about)]
 pub struct Args {
     #[arg(short, long, env, default_value_t = 3007)]
     pub port: u16,
+
+    #[arg(short, long, env)]
+    pub solana_endpoint: String,
 
     #[command(flatten)]
     pub db: db::DbArgs,
@@ -41,16 +45,18 @@ impl AppState {
 }
 
 mod proto {
-    include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
+    include!(concat!(env!("OUT_DIR"), "/organization.proto.rs"));
+    include!(concat!(env!("OUT_DIR"), "/drops.proto.rs"));
 }
 
 #[derive(Debug)]
 pub enum Services {
-    Org(proto::Key, proto::Event),
+    Organizations(proto::OrganizationEventKey, proto::OrganizationEvents),
+    Drops(proto::DropEventKey, proto::DropEvents),
 }
 
 impl hub_core::consumer::MessageGroup for Services {
-    const REQUESTED_TOPICS: &'static [&'static str] = &["hub-orgs"];
+    const REQUESTED_TOPICS: &'static [&'static str] = &["hub-orgs", "hub-drops"];
 
     fn from_message<M: hub_core::consumer::Message>(msg: &M) -> Result<Self, RecvError> {
         let topic = msg.topic();
@@ -60,10 +66,16 @@ impl hub_core::consumer::MessageGroup for Services {
 
         match topic {
             "hub-orgs" => {
-                let key = proto::Key::decode(key)?;
-                let val = proto::Event::decode(val)?;
+                let key = proto::OrganizationEventKey::decode(key)?;
+                let val = proto::OrganizationEvents::decode(val)?;
 
-                Ok(Services::Org(key, val))
+                Ok(Services::Organizations(key, val))
+            },
+            "hub-drops" => {
+                let key = proto::DropEventKey::decode(key)?;
+                let val = proto::DropEvents::decode(val)?;
+
+                Ok(Services::Drops(key, val))
             },
             t => Err(RecvError::BadTopic(t.into())),
         }

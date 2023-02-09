@@ -10,10 +10,11 @@ use hub_core::{
 };
 use poem::{get, listener::TcpListener, middleware::AddData, EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
+use solana_client::rpc_client::RpcClient;
 
 pub fn main() {
     let opts = hub_core::StartConfig {
-        service_name: "hub-orgs",
+        service_name: "hub-treasuries",
     };
 
     hub_core::run(opts, |common, args| {
@@ -21,6 +22,7 @@ pub fn main() {
             port,
             db,
             fireblocks,
+            solana_endpoint,
         } = args;
 
         common.rt.block_on(async move {
@@ -33,9 +35,12 @@ pub fn main() {
                 .server(format!("http://localhost:{port}/v1"));
             let ui = api_service.swagger_ui();
             let spec = api_service.spec_endpoint();
+
             let state = AppState::new(connection.clone(), fireblocks.clone());
 
             let cons = common.consumer_cfg.build::<Services>().await?;
+
+            let rpc_client = RpcClient::new(solana_endpoint);
 
             tokio::spawn(async move {
                 loop {
@@ -43,8 +48,13 @@ pub fn main() {
                         Some(Ok(msg)) => {
                             info!(?msg, "message received");
 
-                            if let Err(e) =
-                                events::process(msg, connection.clone(), fireblocks.clone()).await
+                            if let Err(e) = events::process(
+                                msg,
+                                connection.clone(),
+                                fireblocks.clone(),
+                                &rpc_client,
+                            )
+                            .await
                             {
                                 warn!("failed to process message {:?}", e);
                             }
