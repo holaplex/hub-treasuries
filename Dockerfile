@@ -30,11 +30,6 @@ COPY api api
 COPY migration migration
 COPY fireblocks fireblocks
 
-# Build using corresponding schema registry
-ARG ENVIRONMENT 
-ENV ENVIRONMENT $ENVIRONMENT
-RUN sed -i "s#localhost#eventbus-cluster.$ENVIRONMENT-hub.svc.cluster.local#g" api/proto.toml
-
 FROM builder AS builder-hub-treasuries
 RUN cargo build --release --bin holaplex-hub-treasuries
 
