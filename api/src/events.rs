@@ -132,7 +132,7 @@ pub async fn mint_edition(
 
     let mut tx_details = fireblocks.get_transaction(transaction.id.clone()).await?;
 
-    while tx_details.signed_messages.len() == 0 {
+    while tx_details.signed_messages.is_empty() {
         tx_details = fireblocks.get_transaction(transaction.id.clone()).await?;
     }
 
