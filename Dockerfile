@@ -55,4 +55,3 @@ CMD ["bin/holaplex-hub-treasuries"]
 FROM base AS migrator
 COPY --from=builder-migration /app/target/release/migration bin/
 CMD ["bin/migration"]
-
