@@ -1,4 +1,8 @@
-use hub_core::{clap, prelude::*, serde_json, tracing::info};
+use hub_core::{
+    anyhow::{Context as _, Result},
+    clap, serde_json,
+    tracing::info,
+};
 use jsonwebtoken::EncodingKey;
 use reqwest::{Client as HttpClient, RequestBuilder, Url};
 use serde::Serialize;
@@ -15,7 +19,7 @@ use crate::{
 };
 
 #[derive(clap::Args, Clone, Debug)]
-pub struct FbArgs {
+pub struct Args {
     #[arg(long, env)]
     pub fireblocks_endpoint: String,
     #[arg(long, env)]
@@ -38,8 +42,8 @@ impl Client {
     ///
     /// # Errors
     /// This function fails if ...
-    pub fn new(args: FbArgs) -> Result<Self> {
-        let FbArgs {
+    pub fn new(args: Args) -> Result<Self> {
+        let Args {
             fireblocks_endpoint,
             fireblocks_api_key,
             secret_path,
@@ -166,24 +170,6 @@ impl Client {
     /// This function fails if ...
     pub async fn vault_assets(&self) -> Result<Vec<VaultAsset>> {
         let endpoint = "/v1/vault/assets".to_string();
-        let url = self.base_url.join(&endpoint)?;
-
-        let mut req = self.http.get(url);
-        req = self.authenticate(req, endpoint, ())?;
-
-        let response = req.send().await?.text().await?;
-
-        debug!("{:?}", response);
-
-        Ok(serde_json::from_str(&response)?)
-    }
-
-    /// Res
-    ///
-    /// # Errors
-    /// This function fails if ...
-    pub async fn vault_asset(&self, vault_id: String, asset_id: String) -> Result<VaultAsset> {
-        let endpoint = format!("/v1/vault/accounts/{vault_id}/{asset_id}");
         let url = self.base_url.join(&endpoint)?;
 
         let mut req = self.http.get(url);

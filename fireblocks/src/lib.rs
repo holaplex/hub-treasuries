@@ -12,4 +12,4 @@
 mod client;
 pub mod objects;
 mod signer;
-pub use client::{Client, FbArgs};
+pub use client::{Args, Client};
