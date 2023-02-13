@@ -6,7 +6,7 @@ use fireblocks::objects::{
 };
 use hex::FromHex;
 use hub_core::{prelude::*, uuid::Uuid};
-use sea_orm::{prelude::*, Set};
+use sea_orm::{prelude::*, JoinType, QuerySelect, Set};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{signature::Signature, transaction::Transaction};
 
@@ -42,16 +42,8 @@ pub async fn process(
         },
         Services::Drops(k, e) => match e.event {
             // match topic messages
-            Some(drop_events::Event::MintEditionTransaction(t)) => {
-                mint_edition(k, t, db, fireblocks, rpc).await
-            },
-
-            None => Ok(()),
-        },
-        Services::Drops(k, e) => match e.event {
-            // match topic messages
-            Some(drop_events::Event::MintEditionTransaction(t)) => {
-                mint_edition(k, t, db, fireblocks, rpc).await
+            Some(drop_events::Event::CreateMasterEdition(t)) => {
+                create_master_edition(k, t, db, fireblocks, rpc).await
             },
 
             None => Ok(()),
@@ -109,7 +101,7 @@ pub async fn create_treasury(
 ///
 /// # Errors
 /// This function fails if ...
-pub async fn mint_edition(
+pub async fn create_master_edition(
     k: proto::DropEventKey,
     transaction: proto::Transaction,
     conn: Connection,
@@ -119,18 +111,28 @@ pub async fn mint_edition(
     let proto::Transaction {
         serialized_message,
         signed_message_signature,
-        hashed_message,
         project_id,
-        organization_id,
-        blockhash,
     } = transaction;
+
+    let project = Uuid::parse_str(&project_id)?;
+
+    let vault = treasuries::Entity::find()
+        .join(
+            JoinType::InnerJoin,
+            project_treasuries::Relation::Treasuries.def(),
+        )
+        .filter(project_treasuries::Column::ProjectId.eq(project))
+        .one(conn.get())
+        .await?
+        .context("treasury not found in database")?
+        .vault_id;
 
     let tx = CreateTransaction {
         asset_id: "SOL_TEST".to_string(),
         operation: TransactionOperation::RAW,
         source: TransferPeerPath {
             peer_type: "VAULT_ACCOUNT".to_string(),
-            id: "6".to_string(),
+            id: vault,
         },
         destination: None,
         destinations: None,
@@ -139,10 +141,13 @@ pub async fn mint_edition(
         amount: "0".to_string(),
         extra_parameters: Some(RawMessageData {
             messages: vec![UnsignedMessage {
-                content: hashed_message,
+                content: hex::encode(&serialized_message),
             }],
         }),
-        note: Some("solana edition minting".to_string()),
+        note: Some(format!(
+            "CreateMasterEdition by {:?} for project {:?}",
+            k.user_id, project_id
+        )),
     };
 
     let transaction = fireblocks.create_transaction(tx).await?;
@@ -152,8 +157,6 @@ pub async fn mint_edition(
     while tx_details.signed_messages.is_empty() {
         tx_details = fireblocks.get_transaction(transaction.id.clone()).await?;
     }
-
-    debug!("{:?}", tx_details.signed_messages);
 
     let full_sig = tx_details.clone().signed_messages[0]
         .clone()
@@ -166,17 +169,16 @@ pub async fn mint_edition(
 
     let signature = Signature::new(&signature_decoded);
 
-    debug!("signature {:?}", signature);
-    let decoded_message: solana_sdk::message::Message = bincode::deserialize(&serialized_message)?;
+    let decoded_message = bincode::deserialize(&serialized_message)?;
 
     let signed_transaction = Transaction {
         signatures: vec![signature, Signature::from_str(&signed_message_signature)?],
         message: decoded_message,
     };
 
-    let res = rpc.send_transaction(&signed_transaction);
+    let res = rpc.send_transaction(&signed_transaction)?;
 
-    debug!("response {:?}", res);
+    debug!("MasterEdition sucessfully created {:?}", res);
 
     Ok(())
 }

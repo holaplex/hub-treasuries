@@ -18,13 +18,13 @@ use fireblocks::Client as FireblocksClient;
 use hub_core::{
     anyhow::{Error, Result},
     clap,
+    consumer::RecvError,
     prelude::*,
     uuid::Uuid,
 };
 use mutations::Mutation;
 use poem::{async_trait, FromRequest, Request, RequestBody};
 use queries::Query;
-
 pub type AppSchema = Schema<Query, Mutation, EmptySubscription>;
 
 mod proto {
@@ -90,7 +90,6 @@ impl<'a> FromRequest<'a> for UserID {
         Ok(id)
     }
 }
-use hub_core::{consumer::RecvError, prelude::*};
 
 #[derive(Debug, clap::Args)]
 #[command(version, author, about)]

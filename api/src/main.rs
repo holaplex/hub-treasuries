@@ -43,8 +43,9 @@ pub fn main() {
             let cons = common.consumer_cfg.build::<Services>().await?;
 
             tokio::spawn(async move {
+                let mut stream = cons.stream();
                 loop {
-                    match cons.stream().next().await {
+                    match stream.next().await {
                         Some(Ok(msg)) => {
                             info!(?msg, "message received");
 
@@ -75,7 +76,7 @@ pub fn main() {
                         .at("/health", get(health)),
                 )
                 .await
-                .context("failed to graphql server")
+                .context("failed to build graphql server")
         })
     });
 }
