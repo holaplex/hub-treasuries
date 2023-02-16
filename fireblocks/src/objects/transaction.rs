@@ -3,9 +3,9 @@ use hub_core::serde_with::skip_serializing_none;
 use serde::{Deserialize, Serialize};
 
 /// <https://docs.fireblocks.com/api/?javascript#create-a-new-transaction>
-#[derive(Debug, Serialize, Deserialize, SimpleObject)]
-#[serde(rename_all = "camelCase")]
 #[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateTransaction {
     pub asset_id: String,
     pub source: TransferPeerPath,
@@ -16,7 +16,14 @@ pub struct CreateTransaction {
     pub note: Option<String>,
     pub operation: TransactionOperation,
     pub customer_ref_id: Option<String>,
-    pub extra_parameters: Option<RawMessageData>,
+    pub extra_parameters: Option<ExtraParameters>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExtraParameters {
+    Content(String),
+    RawMessageData(RawMessageData),
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#transactionoperation>

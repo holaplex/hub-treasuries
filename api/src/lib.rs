@@ -104,7 +104,7 @@ pub struct Args {
     pub db: db::DbArgs,
 
     #[command(flatten)]
-    pub fireblocks: fireblocks::Args,
+    pub fireblocks: fireblocks::FbArgs,
 }
 
 #[derive(Clone)]

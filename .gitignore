@@ -1,3 +1,4 @@
 /target
 .env.local
 secret.key
+fireblocks_secret.key

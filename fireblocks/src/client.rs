@@ -19,7 +19,7 @@ use crate::{
 };
 
 #[derive(clap::Args, Clone, Debug)]
-pub struct Args {
+pub struct FbArgs {
     #[arg(long, env)]
     pub fireblocks_endpoint: String,
     #[arg(long, env)]
@@ -42,8 +42,8 @@ impl Client {
     ///
     /// # Errors
     /// This function fails if ...
-    pub fn new(args: Args) -> Result<Self> {
-        let Args {
+    pub fn new(args: FbArgs) -> Result<Self> {
+        let FbArgs {
             fireblocks_endpoint,
             fireblocks_api_key,
             secret_path,

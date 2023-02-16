@@ -1,6 +1,7 @@
 use fireblocks::objects::{
     transaction::{
-        CreateTransaction, RawMessageData, TransactionOperation, TransferPeerPath, UnsignedMessage,
+        CreateTransaction, ExtraParameters, RawMessageData, TransactionOperation, TransferPeerPath,
+        UnsignedMessage,
     },
     vault::CreateVault,
 };
@@ -45,7 +46,9 @@ pub async fn process(
             Some(drop_events::Event::CreateMasterEdition(t)) => {
                 create_master_edition(k, t, db, fireblocks, rpc).await
             },
-
+            Some(drop_events::Event::MintEdition(t)) => {
+                mint_edition(k, t, db, fireblocks, rpc).await
+            },
             None => Ok(()),
         },
     }
@@ -119,7 +122,7 @@ pub async fn create_master_edition(
     let vault = treasuries::Entity::find()
         .join(
             JoinType::InnerJoin,
-            project_treasuries::Relation::Treasuries.def(),
+            treasuries::Relation::ProjectTreasuries.def(),
         )
         .filter(project_treasuries::Column::ProjectId.eq(project))
         .one(conn.get())
@@ -139,11 +142,11 @@ pub async fn create_master_edition(
         treat_as_gross_amount: None,
         customer_ref_id: None,
         amount: "0".to_string(),
-        extra_parameters: Some(RawMessageData {
+        extra_parameters: Some(ExtraParameters::RawMessageData(RawMessageData {
             messages: vec![UnsignedMessage {
                 content: hex::encode(&serialized_message),
             }],
-        }),
+        })),
         note: Some(format!(
             "CreateMasterEdition by {:?} for project {:?}",
             k.user_id, project_id
@@ -169,6 +172,8 @@ pub async fn create_master_edition(
 
     let signature = Signature::new(&signature_decoded);
 
+    debug!("{:?}", signature);
+
     let decoded_message = bincode::deserialize(&serialized_message)?;
 
     let signed_transaction = Transaction {
@@ -179,6 +184,99 @@ pub async fn create_master_edition(
     let res = rpc.send_transaction(&signed_transaction)?;
 
     debug!("MasterEdition sucessfully created {:?}", res);
+
+    // emit event
+
+    Ok(())
+}
+
+/// Res
+///
+/// # Errors
+/// This function fails if ...
+pub async fn mint_edition(
+    k: proto::DropEventKey,
+    transaction: proto::Transaction,
+    conn: Connection,
+    fireblocks: fireblocks::Client,
+    rpc: &RpcClient,
+) -> Result<()> {
+    let proto::Transaction {
+        serialized_message,
+        signed_message_signature,
+        project_id,
+    } = transaction;
+
+    let project = Uuid::parse_str(&project_id)?;
+
+    // make it a function
+    let vault = treasuries::Entity::find()
+        .join(
+            JoinType::InnerJoin,
+            treasuries::Relation::ProjectTreasuries.def(),
+        )
+        .filter(project_treasuries::Column::ProjectId.eq(project))
+        .one(conn.get())
+        .await?
+        .context("treasury not found in database")?
+        .vault_id;
+
+    let tx = CreateTransaction {
+        asset_id: "SOL_TEST".to_string(),
+        operation: TransactionOperation::RAW,
+        source: TransferPeerPath {
+            peer_type: "VAULT_ACCOUNT".to_string(),
+            id: vault,
+        },
+        destination: None,
+        destinations: None,
+        treat_as_gross_amount: None,
+        customer_ref_id: None,
+        amount: "0".to_string(),
+        extra_parameters: Some(ExtraParameters::RawMessageData(RawMessageData {
+            messages: vec![UnsignedMessage {
+                content: hex::encode(&serialized_message),
+            }],
+        })),
+        note: Some(format!(
+            "MintedEdition by {:?} for project {:?}",
+            k.user_id, project_id
+        )),
+    };
+
+    let transaction = fireblocks.create_transaction(tx).await?;
+
+    let mut tx_details = fireblocks.get_transaction(transaction.id.clone()).await?;
+
+    while tx_details.signed_messages.is_empty() {
+        tx_details = fireblocks.get_transaction(transaction.id.clone()).await?;
+    }
+
+    let full_sig = tx_details.clone().signed_messages[0]
+        .clone()
+        .signature
+        .full_sig;
+
+    // SIGNATURE LEN = 64 bytes
+
+    let signature_decoded = <[u8; 64]>::from_hex(full_sig)?;
+
+    let signature = Signature::new(&signature_decoded);
+
+    debug!("{:?}", signature);
+
+    let decoded_message = bincode::deserialize(&serialized_message)?;
+
+    let signed_transaction = Transaction {
+        signatures: vec![signature, Signature::from_str(&signed_message_signature)?],
+        message: decoded_message,
+    };
+
+    let res = rpc.send_transaction(&signed_transaction)?;
+
+    info!("Edition minted sucessfully {:?}", res);
+
+    // emit event
 
     Ok(())
 }
