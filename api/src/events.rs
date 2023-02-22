@@ -1,4 +1,4 @@
-use fireblocks::objects::vault::{CreateVault, CreateVaultWallet};
+use fireblocks::objects::vault::CreateVault;
 use hub_core::{prelude::*, uuid::Uuid};
 use sea_orm::{prelude::*, Set};
 
@@ -46,7 +46,7 @@ pub async fn create_project_treasury(
     fireblocks: fireblocks::Client,
 ) -> Result<()> {
     let create_vault = CreateVault {
-        name: project.id.clone(),
+        name: format!("project:{}", project.id.clone()),
         hidden_on_ui: None,
         customer_ref_id: Some(k.user_id),
         auto_fuel: Some(false),
@@ -58,14 +58,6 @@ pub async fn create_project_treasury(
         vault_id: Set(vault.id.clone()),
         ..Default::default()
     };
-
-    let wallet = fireblocks
-        .create_wallet(vault.id.clone(), "SOL_TEST".to_owned(), CreateVaultWallet {
-            eos_account_name: None,
-        })
-        .await?;
-
-    info!("wallet created for project {:?}", wallet);
 
     let treasury: treasuries::Model = treasury
         .clone()
@@ -99,7 +91,7 @@ pub async fn create_customer_treasury(
     fireblocks: fireblocks::Client,
 ) -> Result<()> {
     let create_vault = CreateVault {
-        name: k.id.clone(),
+        name: format!("customer:{}", k.id.clone()),
         hidden_on_ui: None,
         customer_ref_id: None,
         auto_fuel: Some(false),
@@ -108,14 +100,6 @@ pub async fn create_customer_treasury(
     let vault = fireblocks.create_vault(create_vault).await?;
 
     info!("vault created {:?}", vault);
-
-    let wallet = fireblocks
-        .create_wallet(vault.id.clone(), "SOL_TEST".to_owned(), CreateVaultWallet {
-            eos_account_name: None,
-        })
-        .await?;
-
-    info!("wallet created for customer {:?}", wallet);
 
     let treasury = treasuries::ActiveModel {
         vault_id: Set(vault.id.clone()),
