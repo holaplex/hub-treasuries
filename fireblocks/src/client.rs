@@ -213,10 +213,10 @@ impl Client {
         asset_id: String,
         params: CreateVaultWallet,
     ) -> Result<CreateVaultAssetResponse> {
-        let endpoint = "/v1/vault/accounts".to_string();
-        let url = self.base_url.join(&vault_id)?.join(&asset_id)?;
+        let endpoint = format!("/v1/vault/accounts/{vault_id}/{asset_id}");
+        let url = self.base_url.join(&endpoint)?;
 
-        let mut req = self.http.post(url).json(&params);
+        let mut req = self.http.post(url.clone()).json(&params);
         req = self.authenticate(req, endpoint, params)?;
 
         let response = req.send().await?.text().await?;
