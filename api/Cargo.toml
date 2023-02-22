@@ -1,5 +1,5 @@
 [package]
-name = "holaplex-treasury"
+name = "holaplex-hub-treasuries"
 version = "0.1.0"
 publish = false
 authors = [
@@ -13,6 +13,7 @@ license = "AGPL-3.0-or-later"
 keywords = ["hub", "holaplex", "web3"]
 categories = ["cryptography::cryptocurrencies", "web-programming"]
 
+build = "build.rs"
 
 [lib]
 

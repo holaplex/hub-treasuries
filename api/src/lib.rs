@@ -5,6 +5,7 @@
 pub mod db;
 #[allow(clippy::pedantic)]
 pub mod entities;
+pub mod events;
 pub mod handlers;
 pub mod mutations;
 pub mod queries;
@@ -17,14 +18,52 @@ use fireblocks::Client as FireblocksClient;
 use hub_core::{
     anyhow::{Error, Result},
     clap,
+    consumer::RecvError,
     prelude::*,
     uuid::Uuid,
 };
 use mutations::Mutation;
 use poem::{async_trait, FromRequest, Request, RequestBody};
 use queries::Query;
-
 pub type AppSchema = Schema<Query, Mutation, EmptySubscription>;
+
+mod proto {
+    include!(concat!(env!("OUT_DIR"), "/organization.proto.rs"));
+    include!(concat!(env!("OUT_DIR"), "/customer.proto.rs"));
+}
+
+#[derive(Debug)]
+pub enum Services {
+    Organizations(proto::OrganizationEventKey, proto::OrganizationEvents),
+    Customers(proto::CustomerEventKey, proto::CustomerEvents),
+}
+
+impl hub_core::consumer::MessageGroup for Services {
+    const REQUESTED_TOPICS: &'static [&'static str] = &["hub-orgs", "hub-drops"];
+
+    fn from_message<M: hub_core::consumer::Message>(msg: &M) -> Result<Self, RecvError> {
+        let topic = msg.topic();
+        let key = msg.key().ok_or(RecvError::MissingKey)?;
+        let val = msg.payload().ok_or(RecvError::MissingPayload)?;
+        info!(topic, ?key, ?val);
+
+        match topic {
+            "hub-orgs" => {
+                let key = proto::OrganizationEventKey::decode(key)?;
+                let val = proto::OrganizationEvents::decode(val)?;
+
+                Ok(Services::Organizations(key, val))
+            },
+            "hub-customers" => {
+                let key = proto::CustomerEventKey::decode(key)?;
+                let val = proto::CustomerEvents::decode(val)?;
+
+                Ok(Services::Customers(key, val))
+            },
+            t => Err(RecvError::BadTopic(t.into())),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct UserID(Option<Uuid>);
@@ -55,14 +94,14 @@ impl<'a> FromRequest<'a> for UserID {
 #[derive(Debug, clap::Args)]
 #[command(version, author, about)]
 pub struct Args {
-    #[arg(short, long, env, default_value_t = 3002)]
+    #[arg(short, long, env, default_value_t = 3007)]
     pub port: u16,
 
     #[command(flatten)]
     pub db: db::DbArgs,
 
     #[command(flatten)]
-    pub fireblocks: fireblocks::Args,
+    pub fireblocks: fireblocks::FbArgs,
 }
 
 #[derive(Clone)]
@@ -85,7 +124,7 @@ impl AppState {
 
 pub struct AppContext {
     pub db: Connection,
-    pub user_id: UserID,
+    user_id: UserID,
 }
 
 impl AppContext {

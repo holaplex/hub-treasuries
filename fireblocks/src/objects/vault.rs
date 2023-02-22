@@ -1,4 +1,5 @@
 use async_graphql::SimpleObject;
+use hub_core::serde_with::skip_serializing_none;
 use serde::{Deserialize, Serialize};
 
 /// Paged
@@ -79,6 +80,7 @@ pub struct VaultAsset {
 
 /// Query parameters
 /// <https://docs.fireblocks.com/api/?javascript#create-a-new-vault-account>
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateVault {
@@ -89,6 +91,7 @@ pub struct CreateVault {
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#create-a-new-wallet-under-the-vault-account>
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateVaultWallet {

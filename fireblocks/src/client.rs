@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use crate::{
     objects::{
-        transaction::{CreateTransaction, CreateTransactionResponse},
+        transaction::{CreateTransaction, CreateTransactionResponse, TransactionDetails},
         vault::{
             CreateVault, CreateVaultAssetResponse, CreateVaultWallet, QueryVaultAccounts,
             VaultAccount, VaultAccountsPagedResponse, VaultAsset,
@@ -19,7 +19,7 @@ use crate::{
 };
 
 #[derive(clap::Args, Clone, Debug)]
-pub struct Args {
+pub struct FbArgs {
     #[arg(long, env)]
     pub fireblocks_endpoint: String,
     #[arg(long, env)]
@@ -42,8 +42,8 @@ impl Client {
     ///
     /// # Errors
     /// This function fails if ...
-    pub fn new(args: Args) -> Result<Self> {
-        let Args {
+    pub fn new(args: FbArgs) -> Result<Self> {
+        let FbArgs {
             fireblocks_endpoint,
             fireblocks_api_key,
             secret_path,
@@ -132,7 +132,7 @@ impl Client {
         let endpoint = "/v1/vault/accounts".to_string();
         let url = self.base_url.join(&endpoint)?;
 
-        let mut req = self.http.post(url);
+        let mut req = self.http.post(url).json(&params);
         req = self.authenticate(req, endpoint, params)?;
 
         let response = req.send().await?.text().await?;
@@ -195,6 +195,65 @@ impl Client {
 
         let mut req = self.http.post(url).json(&tx);
         req = self.authenticate(req, endpoint, tx)?;
+
+        let response = req.send().await?.text().await?;
+
+        info!("{:?}", response);
+
+        Ok(serde_json::from_str(&response)?)
+    }
+
+    /// Res
+    ///
+    /// # Errors
+    /// This function fails if ...
+    pub async fn create_wallet(
+        &self,
+        vault_id: String,
+        asset_id: String,
+        params: CreateVaultWallet,
+    ) -> Result<CreateVaultAssetResponse> {
+        let endpoint = "/v1/vault/accounts".to_string();
+        let url = self.base_url.join(&vault_id)?.join(&asset_id)?;
+
+        let mut req = self.http.post(url).json(&params);
+        req = self.authenticate(req, endpoint, params)?;
+
+        let response = req.send().await?.text().await?;
+
+        info!("{:?}", response);
+
+        Ok(serde_json::from_str(&response)?)
+    }
+
+    /// Res
+    ///
+    /// # Errors
+    /// This function fails if ...
+    pub async fn transactions(&self) -> Result<Vec<TransactionDetails>> {
+        let endpoint = "/v1/transactions".to_string();
+        let url = self.base_url.join(&endpoint)?;
+
+        let mut req = self.http.get(url);
+        req = self.authenticate(req, endpoint, ())?;
+
+        let response = req.send().await?.text().await?;
+
+        info!("{:?}", response);
+
+        Ok(serde_json::from_str(&response)?)
+    }
+
+    /// Res
+    ///
+    /// # Errors
+    /// This function fails if ...
+    pub async fn get_transaction(&self, txid: String) -> Result<TransactionDetails> {
+        let endpoint = format!("/v1/transactions/{txid}");
+        let url = self.base_url.join(&endpoint)?;
+
+        let mut req = self.http.get(url);
+        req = self.authenticate(req, endpoint, ())?;
 
         let response = req.send().await?.text().await?;
 
