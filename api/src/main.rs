@@ -13,8 +13,6 @@ use hub_core::{
     tokio::{self},
 };
 use poem::{get, listener::TcpListener, middleware::AddData, post, EndpointExt, Route, Server};
-use solana_client::rpc_client::RpcClient;
-
 pub fn main() {
     let opts = hub_core::StartConfig {
         service_name: "hub-treasuries",
@@ -25,7 +23,6 @@ pub fn main() {
             port,
             db,
             fireblocks,
-            solana_endpoint,
         } = args;
 
         common.rt.block_on(async move {
@@ -35,8 +32,6 @@ pub fn main() {
 
             let schema = build_schema();
             let fireblocks = fireblocks::Client::new(fireblocks)?;
-
-            let rpc_client = RpcClient::new(solana_endpoint);
 
             let state = AppState::new(schema, connection.clone(), fireblocks.clone());
 
@@ -49,13 +44,8 @@ pub fn main() {
                         Some(Ok(msg)) => {
                             info!(?msg, "message received");
 
-                            if let Err(e) = events::process(
-                                msg,
-                                connection.clone(),
-                                fireblocks.clone(),
-                                &rpc_client,
-                            )
-                            .await
+                            if let Err(e) =
+                                events::process(msg, connection.clone(), fireblocks.clone()).await
                             {
                                 warn!("failed to process message {:?}", e);
                             }

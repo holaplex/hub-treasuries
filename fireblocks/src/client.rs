@@ -207,6 +207,29 @@ impl Client {
     ///
     /// # Errors
     /// This function fails if ...
+    pub async fn create_wallet(
+        &self,
+        vault_id: String,
+        asset_id: String,
+        params: CreateVaultWallet,
+    ) -> Result<CreateVaultAssetResponse> {
+        let endpoint = "/v1/vault/accounts".to_string();
+        let url = self.base_url.join(&vault_id)?.join(&asset_id)?;
+
+        let mut req = self.http.post(url).json(&params);
+        req = self.authenticate(req, endpoint, params)?;
+
+        let response = req.send().await?.text().await?;
+
+        info!("{:?}", response);
+
+        Ok(serde_json::from_str(&response)?)
+    }
+
+    /// Res
+    ///
+    /// # Errors
+    /// This function fails if ...
     pub async fn transactions(&self) -> Result<Vec<TransactionDetails>> {
         let endpoint = "/v1/transactions".to_string();
         let url = self.base_url.join(&endpoint)?;
