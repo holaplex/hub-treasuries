@@ -1,11 +1,15 @@
-use fireblocks::objects::vault::{CreateVault, CreateVaultWallet};
+use fireblocks::objects::vault::CreateVault;
 use hub_core::{prelude::*, uuid::Uuid};
 use sea_orm::{prelude::*, Set};
 
 use crate::{
     db::Connection,
-    entities::{customer_treasuries, treasuries},
-    proto::{customer_events, CustomerEventKey},
+    entities::{customer_treasuries, project_treasuries, treasuries},
+    proto::{
+        customer_events,
+        organization_events::{self},
+        CustomerEventKey, OrganizationEventKey, Project,
+    },
     Services,
 };
 
@@ -22,8 +26,59 @@ pub async fn process(msg: Services, db: Connection, fireblocks: fireblocks::Clie
             },
             None => Ok(()),
         },
-        Services::Organizations(..) => Ok(()),
+        Services::Organizations(k, e) => match e.event {
+            Some(organization_events::Event::ProjectCreated(p)) => {
+                create_project_treasury(k, p, db, fireblocks).await
+            },
+            Some(_) | None => Ok(()),
+        },
     }
+}
+
+/// Res
+///
+/// # Errors
+/// This function fails if ...
+pub async fn create_project_treasury(
+    k: OrganizationEventKey,
+    project: Project,
+    conn: Connection,
+    fireblocks: fireblocks::Client,
+) -> Result<()> {
+    let create_vault = CreateVault {
+        name: format!("project:{}", project.id.clone()),
+        hidden_on_ui: None,
+        customer_ref_id: Some(k.user_id),
+        auto_fuel: Some(false),
+    };
+
+    let vault = fireblocks.create_vault(create_vault).await?;
+
+    let treasury = treasuries::ActiveModel {
+        vault_id: Set(vault.id.clone()),
+        ..Default::default()
+    };
+
+    let treasury: treasuries::Model = treasury
+        .clone()
+        .insert(conn.get())
+        .await
+        .context("failed to get treasury record from db")?;
+
+    let project_treasuries_active_model = project_treasuries::ActiveModel {
+        project_id: Set(Uuid::parse_str(&project.id).context("failed to parse project id to Uuid")?),
+        treasury_id: Set(treasury.id),
+        ..Default::default()
+    };
+
+    project_treasuries_active_model
+        .insert(conn.get())
+        .await
+        .context("failed to insert project treasuries")?;
+
+    info!("treasury created for project {:?}", project.id);
+
+    Ok(())
 }
 
 /// Res
@@ -36,7 +91,7 @@ pub async fn create_customer_treasury(
     fireblocks: fireblocks::Client,
 ) -> Result<()> {
     let create_vault = CreateVault {
-        name: k.id.clone(),
+        name: format!("customer:{}", k.id.clone()),
         hidden_on_ui: None,
         customer_ref_id: None,
         auto_fuel: Some(false),
@@ -45,14 +100,6 @@ pub async fn create_customer_treasury(
     let vault = fireblocks.create_vault(create_vault).await?;
 
     info!("vault created {:?}", vault);
-
-    let wallet = fireblocks
-        .create_wallet(vault.id.clone(), "SOL_TEST".to_owned(), CreateVaultWallet {
-            eos_account_name: None,
-        })
-        .await?;
-
-    info!("wallet created for customer {:?}", wallet);
 
     let treasury = treasuries::ActiveModel {
         vault_id: Set(vault.id.clone()),
