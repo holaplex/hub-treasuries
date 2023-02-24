@@ -30,16 +30,18 @@ pub type AppSchema = Schema<Query, Mutation, EmptySubscription>;
 mod proto {
     include!(concat!(env!("OUT_DIR"), "/organization.proto.rs"));
     include!(concat!(env!("OUT_DIR"), "/customer.proto.rs"));
+    include!(concat!(env!("OUT_DIR"), "/drops.proto.rs"));
 }
 
 #[derive(Debug)]
 pub enum Services {
     Organizations(proto::OrganizationEventKey, proto::OrganizationEvents),
     Customers(proto::CustomerEventKey, proto::CustomerEvents),
+    Drops(proto::DropEventKey, proto::DropEvents),
 }
 
 impl hub_core::consumer::MessageGroup for Services {
-    const REQUESTED_TOPICS: &'static [&'static str] = &["hub-orgs", "hub-customers"];
+    const REQUESTED_TOPICS: &'static [&'static str] = &["hub-orgs", "hub-customers", "hub-drops"];
 
     fn from_message<M: hub_core::consumer::Message>(msg: &M) -> Result<Self, RecvError> {
         let topic = msg.topic();
@@ -59,6 +61,12 @@ impl hub_core::consumer::MessageGroup for Services {
                 let val = proto::CustomerEvents::decode(val)?;
 
                 Ok(Services::Customers(key, val))
+            },
+            "hub-drops" => {
+                let key = proto::DropEventKey::decode(key)?;
+                let val = proto::DropEvents::decode(val)?;
+
+                Ok(Services::Drops(key, val))
             },
             t => Err(RecvError::BadTopic(t.into())),
         }
@@ -96,6 +104,9 @@ impl<'a> FromRequest<'a> for UserID {
 pub struct Args {
     #[arg(short, long, env, default_value_t = 3007)]
     pub port: u16,
+
+    #[arg(short, long, env)]
+    pub solana_endpoint: String,
 
     #[command(flatten)]
     pub db: db::DbArgs,
