@@ -1,23 +1,25 @@
 use fireblocks::objects::{
     transaction::{
-        CreateTransaction, ExtraParameters, RawMessageData, TransactionOperation, TransferPeerPath,
-        UnsignedMessage,
+        CreateTransaction, ExtraParameters, RawMessageData, TransactionOperation,
+        TransactionStatus, TransferPeerPath, UnsignedMessage,
     },
     vault::CreateVault,
 };
 use hex::FromHex;
-use hub_core::{prelude::*, uuid::Uuid};
+use hub_core::{prelude::*, producer::Producer, tokio::time, uuid::Uuid};
 use sea_orm::{prelude::*, JoinType, QuerySelect, Set};
 use solana_client::rpc_client::RpcClient;
-use solana_sdk::{signature::Signature, transaction::Transaction};
+use solana_sdk::{signature::Signature, transaction::Transaction as SplTransaction};
 
 use crate::{
     db::Connection,
     entities::{customer_treasuries, project_treasuries, treasuries},
     proto::{
-        self, customer_events, drop_events,
+        customer_events, drop_events,
         organization_events::{self},
-        CustomerEventKey, OrganizationEventKey, Project,
+        treasury_events::{self},
+        CustomerEventKey, DropEventKey, OrganizationEventKey, Project, Transaction,
+        TreasuryEventKey, TreasuryEvents,
     },
     Services,
 };
@@ -31,6 +33,7 @@ pub async fn process(
     db: Connection,
     fireblocks: fireblocks::Client,
     rpc: &RpcClient,
+    p: Producer<TreasuryEvents>,
 ) -> Result<()> {
     // match topics
     match msg {
@@ -55,12 +58,13 @@ pub async fn process(
                     db,
                     fireblocks,
                     rpc,
-                    "master edition created".to_string(),
+                    p,
+                    Transactions::CreateMasterEdition,
                 )
                 .await
             },
             Some(drop_events::Event::MintEdition(t)) => {
-                create_raw_transaction(k, t, db, fireblocks, rpc, "edition minted".to_string())
+                create_raw_transaction(k, t, db, fireblocks, rpc, p, Transactions::MintEdition)
                     .await
             },
             None => Ok(()),
@@ -166,14 +170,15 @@ pub async fn create_customer_treasury(
 /// # Errors
 /// This function fails if ...
 pub async fn create_raw_transaction(
-    k: proto::DropEventKey,
-    transaction: proto::Transaction,
+    k: DropEventKey,
+    transaction: Transaction,
     conn: Connection,
     fireblocks: fireblocks::Client,
     rpc: &RpcClient,
-    msg: String,
+    producer: Producer<TreasuryEvents>,
+    t: Transactions,
 ) -> Result<()> {
-    let proto::Transaction {
+    let Transaction {
         serialized_message,
         signed_message_signatures,
         project_id,
@@ -188,7 +193,9 @@ pub async fn create_raw_transaction(
         .context("failed to get mint signature")?;
     let note = Some(format!(
         "{:?} by {:?} for project {:?}",
-        msg, k.user_id, project_id
+        t.to_string(),
+        k.user_id,
+        project_id
     ));
 
     let vault = treasuries::Entity::find()
@@ -222,15 +229,25 @@ pub async fn create_raw_transaction(
         note: note.clone(),
     };
 
+    let mut interval = time::interval(time::Duration::from_secs(30));
+
     let transaction = fireblocks.create_transaction(tx).await?;
 
     let mut tx_details = fireblocks.get_transaction(transaction.id.clone()).await?;
 
-    while tx_details.signed_messages.is_empty() {
+    for _ in 0..10 {
+        if !tx_details.clone().signed_messages.is_empty() {
+            break;
+        }
+        interval.tick().await;
         tx_details = fireblocks.get_transaction(transaction.id.clone()).await?;
     }
 
-    let full_sig = tx_details.clone().signed_messages[0]
+    let full_sig = tx_details
+        .clone()
+        .signed_messages
+        .get(0)
+        .context("failed to get signed message response")?
         .clone()
         .signature
         .full_sig;
@@ -243,11 +260,11 @@ pub async fn create_raw_transaction(
 
     let decoded_message = bincode::deserialize(&serialized_message)?;
 
-    let signed_transaction = Transaction {
+    let signed_transaction = SplTransaction {
         signatures: vec![
             Signature::from_str(payer_signature)?,
-            signature,
             Signature::from_str(mint_signature)?,
+            signature,
         ],
         message: decoded_message,
     };
@@ -256,7 +273,43 @@ pub async fn create_raw_transaction(
 
     info!("{:?} signature {:?}", note, res);
 
-    // emit event
+    emit_transaction_status_event(producer, t, k.id, tx_details.status)
+        .await
+        .context("failed to emit transaction status event")?;
 
     Ok(())
+}
+
+async fn emit_transaction_status_event(
+    producer: Producer<TreasuryEvents>,
+    t: Transactions,
+    id: String,
+    status: TransactionStatus,
+) -> Result<()> {
+    let proto_status = status as i32;
+    let event = match t {
+        Transactions::CreateMasterEdition => treasury_events::Event::MasterEdition(proto_status),
+        Transactions::MintEdition => treasury_events::Event::MintEdition(proto_status),
+    };
+
+    let event = TreasuryEvents { event: Some(event) };
+
+    let key = TreasuryEventKey { id };
+
+    producer
+        .send(Some(&event), Some(&key))
+        .await
+        .map_err(Into::into)
+}
+
+#[derive(Debug)]
+pub enum Transactions {
+    CreateMasterEdition,
+    MintEdition,
+}
+
+impl fmt::Display for Transactions {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
 }

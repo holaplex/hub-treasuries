@@ -20,17 +20,22 @@ use hub_core::{
     clap,
     consumer::RecvError,
     prelude::*,
+    producer::Producer,
     uuid::Uuid,
 };
 use mutations::Mutation;
 use poem::{async_trait, FromRequest, Request, RequestBody};
+use proto::{TreasuryEventKey, TreasuryEvents};
 use queries::Query;
+
 pub type AppSchema = Schema<Query, Mutation, EmptySubscription>;
 
-mod proto {
+#[allow(clippy::pedantic)]
+pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/organization.proto.rs"));
     include!(concat!(env!("OUT_DIR"), "/customer.proto.rs"));
     include!(concat!(env!("OUT_DIR"), "/drops.proto.rs"));
+    include!(concat!(env!("OUT_DIR"), "/treasury.proto.rs"));
 }
 
 #[derive(Debug)]
@@ -71,6 +76,10 @@ impl hub_core::consumer::MessageGroup for Services {
             t => Err(RecvError::BadTopic(t.into())),
         }
     }
+}
+
+impl hub_core::producer::Message for TreasuryEvents {
+    type Key = TreasuryEventKey;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -120,15 +129,22 @@ pub struct AppState {
     pub schema: AppSchema,
     pub connection: Connection,
     pub fireblocks: FireblocksClient,
+    pub producer: Producer<TreasuryEvents>,
 }
 
 impl AppState {
     #[must_use]
-    pub fn new(schema: AppSchema, connection: Connection, fireblocks: FireblocksClient) -> Self {
+    pub fn new(
+        schema: AppSchema,
+        connection: Connection,
+        fireblocks: FireblocksClient,
+        producer: Producer<TreasuryEvents>,
+    ) -> Self {
         Self {
             schema,
             connection,
             fireblocks,
+            producer,
         }
     }
 }

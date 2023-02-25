@@ -83,22 +83,22 @@ pub struct OneTimeAddress {
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Serialize, Deserialize, Debug)]
 pub enum TransactionStatus {
-    SUBMITTED,
-    QUEUED,
-    PENDING_AUTHORIZATION,
-    PENDING_SIGNATURE,
-    BROADCASTING,
-    PENDING_3RD_PARTY_MANUAL_APPROVAL,
-    PENDING_3RD_PARTY,
-    CONFIRMING,
-    PARTIALLY_COMPLETED,
-    PENDING_AML_SCREENING,
-    COMPLETED,
-    CANCELLED,
-    REJECTED,
-    BLOCKED,
-    FAILED,
-    PENDING,
+    SUBMITTED = 0,
+    QUEUED = 1,
+    PENDING_AUTHORIZATION = 2,
+    PENDING_SIGNATURE = 3,
+    BROADCASTING = 4,
+    PENDING_3RD_PARTY_MANUAL_APPROVAL = 5,
+    PENDING_3RD_PARTY = 6,
+    CONFIRMING = 7,
+    PARTIALLY_COMPLETED = 8,
+    PENDING_AML_SCREENING = 9,
+    COMPLETED = 10,
+    CANCELLED = 11,
+    REJECTED = 12,
+    BLOCKED = 13,
+    FAILED = 14,
+    PENDING = 15,
 }
 
 /// <https://docs.fireblocks.com/api/?javascript#createtransactionresponse>

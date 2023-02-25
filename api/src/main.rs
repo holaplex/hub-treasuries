@@ -5,12 +5,12 @@ use holaplex_hub_treasuries::{
     db::Connection,
     events,
     handlers::{graphql_handler, health, playground},
-    AppState, Args, Services,
+    proto, AppState, Args, Services,
 };
 use hub_core::{
     anyhow::Context as AnyhowContext,
     prelude::*,
-    tokio::{self},
+    tokio::{self, task},
 };
 use poem::{get, listener::TcpListener, middleware::AddData, post, EndpointExt, Route, Server};
 use solana_client::rpc_client::RpcClient;
@@ -34,34 +34,50 @@ pub fn main() {
 
             let schema = build_schema();
             let fireblocks = fireblocks::Client::new(fireblocks)?;
-            let rpc_client = RpcClient::new(solana_endpoint);
+            let rpc_client = Arc::new(RpcClient::new(solana_endpoint));
+            let producer = common.producer_cfg.build::<proto::TreasuryEvents>().await?;
 
-            let state = AppState::new(schema, connection.clone(), fireblocks.clone());
+            let state = AppState::new(
+                schema,
+                connection.clone(),
+                fireblocks.clone(),
+                producer.clone(),
+            );
 
             let cons = common.consumer_cfg.build::<Services>().await?;
 
             tokio::spawn(async move {
-                let mut stream = cons.stream();
-                loop {
-                    match stream.next().await {
-                        Some(Ok(msg)) => {
-                            info!(?msg, "message received");
+                {
+                    let mut stream = cons.stream();
+                    loop {
+                        let fireblocks = fireblocks.clone();
+                        let connection = connection.clone();
+                        let rpc_client = rpc_client.clone();
 
-                            if let Err(e) = events::process(
-                                msg,
-                                connection.clone(),
-                                fireblocks.clone(),
-                                &rpc_client,
-                            )
-                            .await
-                            {
-                                warn!("failed to process message {:?}", e);
-                            }
-                        },
-                        None => (),
-                        Some(Err(e)) => {
-                            warn!("failed to get message {:?}", e);
-                        },
+                        let producer = producer.clone();
+                        match stream.next().await {
+                            Some(Ok(msg)) => {
+                                info!(?msg, "message received");
+
+                                tokio::spawn(async move {
+                                    {
+                                        events::process(
+                                            msg,
+                                            connection.clone(),
+                                            fireblocks.clone(),
+                                            &rpc_client,
+                                            producer,
+                                        )
+                                        .await
+                                    }
+                                });
+                                task::yield_now().await;
+                            },
+                            None => (),
+                            Some(Err(e)) => {
+                                warn!("failed to get message {:?}", e);
+                            },
+                        }
                     }
                 }
             });
