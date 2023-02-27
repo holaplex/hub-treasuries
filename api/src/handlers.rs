@@ -27,7 +27,12 @@ pub async fn graphql_handler(
 
     Ok(state
         .schema
-        .execute(req.0.data(context).data(state.fireblocks.clone()))
+        .execute(
+            req.0
+                .data(context)
+                .data(state.fireblocks.clone())
+                .data(state.producer.clone()),
+        )
         .await
         .into())
 }

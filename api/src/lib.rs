@@ -20,26 +20,33 @@ use hub_core::{
     clap,
     consumer::RecvError,
     prelude::*,
+    producer::Producer,
     uuid::Uuid,
 };
 use mutations::Mutation;
 use poem::{async_trait, FromRequest, Request, RequestBody};
+use proto::{TreasuryEventKey, TreasuryEvents};
 use queries::Query;
+
 pub type AppSchema = Schema<Query, Mutation, EmptySubscription>;
 
-mod proto {
+#[allow(clippy::pedantic)]
+pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/organization.proto.rs"));
     include!(concat!(env!("OUT_DIR"), "/customer.proto.rs"));
+    include!(concat!(env!("OUT_DIR"), "/drops.proto.rs"));
+    include!(concat!(env!("OUT_DIR"), "/treasury.proto.rs"));
 }
 
 #[derive(Debug)]
 pub enum Services {
     Organizations(proto::OrganizationEventKey, proto::OrganizationEvents),
     Customers(proto::CustomerEventKey, proto::CustomerEvents),
+    Drops(proto::DropEventKey, proto::DropEvents),
 }
 
 impl hub_core::consumer::MessageGroup for Services {
-    const REQUESTED_TOPICS: &'static [&'static str] = &["hub-orgs", "hub-customers"];
+    const REQUESTED_TOPICS: &'static [&'static str] = &["hub-orgs", "hub-customers", "hub-drops"];
 
     fn from_message<M: hub_core::consumer::Message>(msg: &M) -> Result<Self, RecvError> {
         let topic = msg.topic();
@@ -60,9 +67,19 @@ impl hub_core::consumer::MessageGroup for Services {
 
                 Ok(Services::Customers(key, val))
             },
+            "hub-drops" => {
+                let key = proto::DropEventKey::decode(key)?;
+                let val = proto::DropEvents::decode(val)?;
+
+                Ok(Services::Drops(key, val))
+            },
             t => Err(RecvError::BadTopic(t.into())),
         }
     }
+}
+
+impl hub_core::producer::Message for TreasuryEvents {
+    type Key = TreasuryEventKey;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -97,6 +114,9 @@ pub struct Args {
     #[arg(short, long, env, default_value_t = 3007)]
     pub port: u16,
 
+    #[arg(short, long, env)]
+    pub solana_endpoint: String,
+
     #[command(flatten)]
     pub db: db::DbArgs,
 
@@ -109,15 +129,22 @@ pub struct AppState {
     pub schema: AppSchema,
     pub connection: Connection,
     pub fireblocks: FireblocksClient,
+    pub producer: Producer<TreasuryEvents>,
 }
 
 impl AppState {
     #[must_use]
-    pub fn new(schema: AppSchema, connection: Connection, fireblocks: FireblocksClient) -> Self {
+    pub fn new(
+        schema: AppSchema,
+        connection: Connection,
+        fireblocks: FireblocksClient,
+        producer: Producer<TreasuryEvents>,
+    ) -> Self {
         Self {
             schema,
             connection,
             fireblocks,
+            producer,
         }
     }
 }
