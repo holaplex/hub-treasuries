@@ -17,8 +17,10 @@ use crate::{
     proto::{
         customer_events, drop_events,
         organization_events::{self},
-        treasury_events::{self},
-        CustomerEventKey, DropEventKey, OrganizationEventKey, Project, Transaction,
+        treasury_events::{
+            CustomerTreasury, DropCreated, DropMinted, {self},
+        },
+        Customer, CustomerEventKey, DropEventKey, OrganizationEventKey, Project, Transaction,
         TreasuryEventKey, TreasuryEvents,
     },
     Services,
@@ -33,39 +35,66 @@ pub async fn process(
     db: Connection,
     fireblocks: fireblocks::Client,
     rpc: &RpcClient,
-    p: Producer<TreasuryEvents>,
+    producer: Producer<TreasuryEvents>,
 ) -> Result<()> {
     // match topics
     match msg {
-        Services::Customers(k, e) => match e.event {
-            Some(customer_events::Event::Created(_)) => {
-                create_customer_treasury(k, db, fireblocks).await
+        Services::Customers(key, e) => match e.event {
+            Some(customer_events::Event::Created(customer)) => {
+                create_customer_treasury(db, fireblocks, producer, key, customer).await
             },
             None => Ok(()),
         },
-        Services::Organizations(k, e) => match e.event {
+        Services::Organizations(key, e) => match e.event {
             Some(organization_events::Event::ProjectCreated(p)) => {
-                create_project_treasury(k, p, db, fireblocks).await
+                create_project_treasury(key, p, db, fireblocks).await
             },
             Some(_) | None => Ok(()),
         },
-        Services::Drops(k, e) => match e.event {
+        Services::Drops(key, e) => match e.event {
             // match topic messages
-            Some(drop_events::Event::CreateMasterEdition(t)) => {
-                create_raw_transaction(
-                    k,
-                    t,
+            Some(drop_events::Event::CreateDrop(payload)) => {
+                let status = create_raw_transaction(
+                    key.clone(),
+                    payload.transaction.context("transaction not found")?,
+                    payload.project_id.clone(),
                     db,
                     fireblocks,
                     rpc,
-                    p,
                     Transactions::CreateMasterEdition,
                 )
+                .await?;
+
+                emit_drop_created_event(producer, key.id, DropCreated {
+                    project_id: payload.project_id,
+                    status: status as i32,
+                })
                 .await
+                .context("failed to emit drop_created event")?;
+
+                Ok(())
             },
-            Some(drop_events::Event::MintEdition(t)) => {
-                create_raw_transaction(k, t, db, fireblocks, rpc, p, Transactions::MintEdition)
-                    .await
+            Some(drop_events::Event::MintDrop(payload)) => {
+                let status = create_raw_transaction(
+                    key.clone(),
+                    payload.transaction.context("transaction not found")?,
+                    payload.project_id.clone(),
+                    db,
+                    fireblocks,
+                    rpc,
+                    Transactions::MintEdition,
+                )
+                .await?;
+
+                emit_drop_minted_event(producer, key.id, DropMinted {
+                    project_id: payload.project_id,
+                    drop_id: payload.drop_id,
+                    status: status as i32,
+                })
+                .await
+                .context("failed to emit drop_created event")?;
+
+                Ok(())
             },
             None => Ok(()),
         },
@@ -123,12 +152,14 @@ pub async fn create_project_treasury(
 /// # Errors
 /// This function fails if ...
 pub async fn create_customer_treasury(
-    k: CustomerEventKey,
     conn: Connection,
     fireblocks: fireblocks::Client,
+    producer: Producer<TreasuryEvents>,
+    key: CustomerEventKey,
+    customer: Customer,
 ) -> Result<()> {
     let create_vault = CreateVault {
-        name: format!("customer:{}", k.id.clone()),
+        name: format!("customer:{}", key.id.clone()),
         hidden_on_ui: None,
         customer_ref_id: None,
         auto_fuel: Some(false),
@@ -150,7 +181,7 @@ pub async fn create_customer_treasury(
         .context("failed to insert treasury record")?;
 
     let customer_am = customer_treasuries::ActiveModel {
-        customer_id: Set(Uuid::parse_str(&k.id).context("failed to parse customer id to Uuid")?),
+        customer_id: Set(Uuid::parse_str(&key.id).context("failed to parse customer id to Uuid")?),
         treasury_id: Set(treasury.id),
         ..Default::default()
     };
@@ -160,7 +191,22 @@ pub async fn create_customer_treasury(
         .await
         .context("failed to insert customer treasuries")?;
 
-    info!("treasury created for customer {:?}", k.id);
+    info!("treasury created for customer {:?}", key.id);
+
+    let event = TreasuryEvents {
+        event: Some(treasury_events::Event::CustomerTreasuryCreated(
+            CustomerTreasury {
+                customer_id: key.id,
+                project_id: customer.project_id,
+            },
+        )),
+    };
+
+    let key = TreasuryEventKey {
+        id: treasury.id.to_string(),
+    };
+
+    producer.send(Some(&event), Some(&key)).await?;
 
     Ok(())
 }
@@ -172,16 +218,15 @@ pub async fn create_customer_treasury(
 pub async fn create_raw_transaction(
     k: DropEventKey,
     transaction: Transaction,
+    project_id: String,
     conn: Connection,
     fireblocks: fireblocks::Client,
     rpc: &RpcClient,
-    producer: Producer<TreasuryEvents>,
     t: Transactions,
-) -> Result<()> {
+) -> Result<TransactionStatus> {
     let Transaction {
         serialized_message,
         signed_message_signatures,
-        project_id,
     } = transaction;
 
     let project = Uuid::parse_str(&project_id)?;
@@ -273,26 +318,36 @@ pub async fn create_raw_transaction(
 
     info!("{:?} signature {:?}", note, res);
 
-    emit_transaction_status_event(producer, t, k.id, tx_details.status)
-        .await
-        .context("failed to emit transaction status event")?;
+    Ok(tx_details.status)
 
-    Ok(())
+    // Ok(())
 }
 
-async fn emit_transaction_status_event(
+async fn emit_drop_created_event(
     producer: Producer<TreasuryEvents>,
-    t: Transactions,
     id: String,
-    status: TransactionStatus,
+    payload: DropCreated,
 ) -> Result<()> {
-    let proto_status = status as i32;
-    let event = match t {
-        Transactions::CreateMasterEdition => treasury_events::Event::MasterEdition(proto_status),
-        Transactions::MintEdition => treasury_events::Event::MintEdition(proto_status),
+    let event = TreasuryEvents {
+        event: Some(treasury_events::Event::DropCreated(payload)),
     };
 
-    let event = TreasuryEvents { event: Some(event) };
+    let key = TreasuryEventKey { id };
+
+    producer
+        .send(Some(&event), Some(&key))
+        .await
+        .map_err(Into::into)
+}
+
+async fn emit_drop_minted_event(
+    producer: Producer<TreasuryEvents>,
+    id: String,
+    payload: DropMinted,
+) -> Result<()> {
+    let event = TreasuryEvents {
+        event: Some(treasury_events::Event::DropMinted(payload)),
+    };
 
     let key = TreasuryEventKey { id };
 
