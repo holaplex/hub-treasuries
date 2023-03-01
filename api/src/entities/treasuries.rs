@@ -5,8 +5,9 @@ use serde::{Deserialize, Serialize};
 use super::wallets;
 use crate::AppContext;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize, SimpleObject)]
 #[sea_orm(table_name = "treasuries")]
+#[graphql(complex, concrete(name = "Treasury", params()))]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
@@ -15,35 +16,20 @@ pub struct Model {
     pub created_at: DateTime,
 }
 
-#[Object(name = "Treasury")]
+#[ComplexObject]
 
 impl Model {
-    async fn id(&self) -> &Uuid {
-        &self.id
-    }
+    async fn wallets(&self, ctx: &Context<'_>) -> Result<Option<Vec<wallets::Model>>> {
+        let AppContext { wallets_loader, .. } = ctx.data::<AppContext>()?;
 
-    async fn vault_id(&self) -> &str {
-        &self.vault_id
-    }
-
-    async fn created_at(&self) -> &DateTime {
-        &self.created_at
-    }
-
-    async fn wallets(&self, ctx: &Context<'_>) -> Result<Vec<wallets::Model>> {
-        let AppContext { db, .. } = ctx.data::<AppContext>()?;
-
-        let wallets = wallets::Entity::find()
-            .filter(wallets::Column::TreasuryId.eq(self.id))
-            .all(db.get())
-            .await?;
-
-        Ok(wallets)
+        wallets_loader.load_one(self.id).await
     }
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_one = "super::customer_treasuries::Entity")]
+    CustomerTreasuries,
     #[sea_orm(has_one = "super::project_treasuries::Entity")]
     ProjectTreasuries,
     #[sea_orm(has_many = "super::wallets::Entity")]
@@ -59,6 +45,12 @@ impl Related<super::project_treasuries::Entity> for Entity {
 impl Related<super::wallets::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Wallets.def()
+    }
+}
+
+impl Related<super::customer_treasuries::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::CustomerTreasuries.def()
     }
 }
 

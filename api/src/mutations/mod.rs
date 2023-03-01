@@ -1,4 +1,4 @@
-pub mod vault;
+mod vault;
 
 // // Add your other ones here to create a unified Mutation object
 // // e.x. Mutation(OrganizationMutation, OtherMutation, OtherOtherMutation)

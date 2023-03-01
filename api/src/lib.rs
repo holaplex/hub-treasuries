@@ -2,17 +2,22 @@
 #![warn(clippy::pedantic, clippy::cargo)]
 #![allow(clippy::module_name_repetitions)]
 
+pub mod dataloaders;
 pub mod db;
 #[allow(clippy::pedantic)]
 pub mod entities;
 pub mod events;
 pub mod handlers;
 pub mod mutations;
+pub mod objects;
 pub mod queries;
+
 use async_graphql::{
+    dataloader::DataLoader,
     extensions::{ApolloTracing, Logger},
     EmptySubscription, Schema,
 };
+use dataloaders::{CustomerTreasuryLoader, ProjectTreasuryLoader, WalletsLoader};
 use db::Connection;
 use fireblocks::Client as FireblocksClient;
 use hub_core::{
@@ -21,6 +26,7 @@ use hub_core::{
     consumer::RecvError,
     prelude::*,
     producer::Producer,
+    tokio,
     uuid::Uuid,
 };
 use mutations::Mutation;
@@ -151,13 +157,28 @@ impl AppState {
 
 pub struct AppContext {
     pub db: Connection,
-    user_id: UserID,
+    pub user_id: UserID,
+    pub customer_treasury_loader: DataLoader<CustomerTreasuryLoader>,
+    pub project_treasury_loader: DataLoader<ProjectTreasuryLoader>,
+    pub wallets_loader: DataLoader<WalletsLoader>,
 }
 
 impl AppContext {
     #[must_use]
     pub fn new(db: Connection, user_id: UserID) -> Self {
-        Self { db, user_id }
+        let customer_treasury_loader =
+            DataLoader::new(CustomerTreasuryLoader::new(db.clone()), tokio::spawn);
+        let project_treasury_loader =
+            DataLoader::new(ProjectTreasuryLoader::new(db.clone()), tokio::spawn);
+        let wallets_loader = DataLoader::new(WalletsLoader::new(db.clone()), tokio::spawn);
+
+        Self {
+            db,
+            user_id,
+            customer_treasury_loader,
+            project_treasury_loader,
+            wallets_loader,
+        }
     }
 }
 
