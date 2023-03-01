@@ -15,12 +15,12 @@ use crate::{
     db::Connection,
     entities::{customer_treasuries, project_treasuries, treasuries},
     proto::{
-        customer_events, drop_events,
+        customer_events, nft_events,
         organization_events::{self},
         treasury_events::{
             CustomerTreasury, DropCreated, DropMinted, {self},
         },
-        Customer, CustomerEventKey, DropEventKey, OrganizationEventKey, Project, Transaction,
+        Customer, CustomerEventKey, NftEventKey, OrganizationEventKey, Project, Transaction,
         TreasuryEventKey, TreasuryEvents,
     },
     Services,
@@ -51,9 +51,9 @@ pub async fn process(
             },
             Some(_) | None => Ok(()),
         },
-        Services::Drops(key, e) => match e.event {
+        Services::Nfts(key, e) => match e.event {
             // match topic messages
-            Some(drop_events::Event::CreateDrop(payload)) => {
+            Some(nft_events::Event::CreateDrop(payload)) => {
                 let status = create_raw_transaction(
                     key.clone(),
                     payload.transaction.context("transaction not found")?,
@@ -74,7 +74,7 @@ pub async fn process(
 
                 Ok(())
             },
-            Some(drop_events::Event::MintDrop(payload)) => {
+            Some(nft_events::Event::MintDrop(payload)) => {
                 let status = create_raw_transaction(
                     key.clone(),
                     payload.transaction.context("transaction not found")?,
@@ -219,7 +219,7 @@ pub async fn create_customer_treasury(
 /// # Errors
 /// This function fails if ...
 pub async fn create_raw_transaction(
-    k: DropEventKey,
+    k: NftEventKey,
     transaction: Transaction,
     project_id: String,
     conn: Connection,

@@ -1,3 +1,5 @@
+#![allow(clippy::unused_async)]
+
 mod customer;
 mod project;
 
