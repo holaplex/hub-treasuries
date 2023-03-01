@@ -180,9 +180,12 @@ pub async fn create_customer_treasury(
         .await
         .context("failed to insert treasury record")?;
 
+    let project_id = Uuid::from_str(&customer.project_id)?;
+
     let customer_am = customer_treasuries::ActiveModel {
         customer_id: Set(Uuid::parse_str(&key.id).context("failed to parse customer id to Uuid")?),
         treasury_id: Set(treasury.id),
+        project_id: Set(project_id),
         ..Default::default()
     };
 
