@@ -1,28 +1,16 @@
-use async_graphql::{Context, Enum, Error, InputObject, Object, Result, SimpleObject};
+use std::str::FromStr;
+
+use async_graphql::{Context, Error, InputObject, Object, Result, SimpleObject};
 use fireblocks::{objects::vault::CreateVaultWallet, Client as FireblocksClient};
 use sea_orm::{prelude::*, Set};
 
 use crate::{
-    entities::{treasuries, wallets},
+    entities::{
+        treasuries,
+        wallets::{self, AssetType},
+    },
     AppContext, UserID,
 };
-
-#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AssetType {
-    #[graphql(name = "SOL")]
-    Solana,
-    #[graphql(name = "SOL_TEST")]
-    SolanaTest,
-}
-
-impl From<AssetType> for String {
-    fn from(value: AssetType) -> Self {
-        match value {
-            AssetType::Solana => "SOL".to_string(),
-            AssetType::SolanaTest => "SOL_TEST".to_string(),
-        }
-    }
-}
 
 #[derive(Default)]
 pub struct Mutation;
@@ -66,7 +54,7 @@ impl Mutation {
 
         let active_model = wallets::ActiveModel {
             treasury_id: Set(treasury_id),
-            asset_id: Set(vault_asset.id),
+            asset_id: Set(AssetType::from_str(&vault_asset.id)?),
             address: Set(vault_asset.address),
             legacy_address: Set(vault_asset.legacy_address),
             tag: Set(vault_asset.tag),

@@ -1,16 +1,60 @@
-use async_graphql::{Context, Error, Object, Result};
-use fireblocks::{objects::vault::VaultAsset, Client as FireblocksClient};
+use std::str::FromStr;
+
+use async_graphql::{Enum, Result, SimpleObject};
+use hub_core::anyhow::{anyhow, Error};
 use sea_orm::entity::prelude::*;
 
-use super::treasuries;
-use crate::AppContext;
+const SOL: &str = "SOL";
+const SOL_TEST: &str = "SOL_TEST";
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
+#[sea_orm(rs_type = "i32", db_type = "Integer")]
+pub enum AssetType {
+    #[graphql(name = "SOL")]
+    #[sea_orm(num_value = 0)]
+    Solana,
+    #[graphql(name = "SOL_TEST")]
+    #[sea_orm(num_value = 1)]
+    SolanaTest,
+}
+
+impl From<AssetType> for i32 {
+    fn from(value: AssetType) -> Self {
+        match value {
+            AssetType::Solana => 0,
+            AssetType::SolanaTest => 1,
+        }
+    }
+}
+
+impl From<AssetType> for String {
+    fn from(value: AssetType) -> Self {
+        match value {
+            AssetType::Solana => SOL.to_string(),
+            AssetType::SolanaTest => SOL_TEST.to_string(),
+        }
+    }
+}
+
+impl FromStr for AssetType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            SOL => Ok(Self::Solana),
+            SOL_TEST => Ok(Self::SolanaTest),
+            &_ => Err(anyhow!("unsupported  asset_type")),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, SimpleObject)]
 #[sea_orm(table_name = "wallets")]
+#[graphql(concrete(name = "Wallet", params()))]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub treasury_id: Uuid,
-    pub asset_id: String,
+    pub asset_id: AssetType,
     #[sea_orm(primary_key, auto_increment = false)]
     pub address: String,
     pub legacy_address: String,
@@ -18,56 +62,6 @@ pub struct Model {
     pub created_at: DateTime,
     pub removed_at: Option<DateTime>,
     pub created_by: Uuid,
-}
-
-#[Object(name = "Wallet")]
-impl Model {
-    async fn treasury_id(&self) -> &Uuid {
-        &self.treasury_id
-    }
-
-    async fn asset_id(&self) -> &str {
-        &self.asset_id
-    }
-
-    async fn address(&self) -> &str {
-        &self.address
-    }
-
-    async fn legacy_address(&self) -> &str {
-        &self.legacy_address
-    }
-
-    async fn tag(&self) -> &str {
-        &self.tag
-    }
-
-    async fn created_at(&self) -> &DateTime {
-        &self.created_at
-    }
-
-    async fn removed_at(&self) -> Option<DateTime> {
-        self.removed_at
-    }
-
-    async fn created_by(&self) -> &Uuid {
-        &self.created_by
-    }
-
-    async fn balance(&self, ctx: &Context<'_>) -> Result<Vec<VaultAsset>> {
-        let fireblocks = ctx.data::<FireblocksClient>()?;
-        let AppContext { db, .. } = ctx.data::<AppContext>()?;
-
-        let res = treasuries::Entity::find_by_id(self.treasury_id)
-            .one(db.get())
-            .await?;
-
-        let t = res.ok_or_else(|| Error::new("failed to get treasury"))?;
-
-        let v = fireblocks.get_vault(t.vault_id.clone()).await?;
-
-        Ok(v.assets)
-    }
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
