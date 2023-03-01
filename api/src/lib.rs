@@ -40,7 +40,7 @@ pub type AppSchema = Schema<Query, Mutation, EmptySubscription>;
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/organization.proto.rs"));
     include!(concat!(env!("OUT_DIR"), "/customer.proto.rs"));
-    include!(concat!(env!("OUT_DIR"), "/drops.proto.rs"));
+    include!(concat!(env!("OUT_DIR"), "/nfts.proto.rs"));
     include!(concat!(env!("OUT_DIR"), "/treasury.proto.rs"));
 }
 
@@ -48,7 +48,7 @@ pub mod proto {
 pub enum Services {
     Organizations(proto::OrganizationEventKey, proto::OrganizationEvents),
     Customers(proto::CustomerEventKey, proto::CustomerEvents),
-    Drops(proto::DropEventKey, proto::DropEvents),
+    Nfts(proto::NftEventKey, proto::NftEvents),
 }
 
 impl hub_core::consumer::MessageGroup for Services {
@@ -73,11 +73,11 @@ impl hub_core::consumer::MessageGroup for Services {
 
                 Ok(Services::Customers(key, val))
             },
-            "hub-drops" => {
-                let key = proto::DropEventKey::decode(key)?;
-                let val = proto::DropEvents::decode(val)?;
+            "hub-nfts" => {
+                let key = proto::NftEventKey::decode(key)?;
+                let val = proto::NftEvents::decode(val)?;
 
-                Ok(Services::Drops(key, val))
+                Ok(Services::Nfts(key, val))
             },
             t => Err(RecvError::BadTopic(t.into())),
         }
