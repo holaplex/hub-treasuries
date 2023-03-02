@@ -20,8 +20,6 @@ pub fn main() {
     };
 
     hub_core::run(opts, |common, args| {
-        debug!("{:?}", args);
-
         let Args {
             port,
             solana_endpoint,
