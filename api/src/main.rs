@@ -23,6 +23,7 @@ pub fn main() {
         let Args {
             port,
             solana_endpoint,
+            fireblocks_supported_asset_ids,
             db,
             fireblocks,
         } = args;
@@ -53,8 +54,9 @@ pub fn main() {
                         let fireblocks = fireblocks.clone();
                         let connection = connection.clone();
                         let rpc_client = rpc_client.clone();
-
+                        let fireblocks_supported_asset_ids = fireblocks_supported_asset_ids.clone();
                         let producer = producer.clone();
+
                         match stream.next().await {
                             Some(Ok(msg)) => {
                                 info!(?msg, "message received");
@@ -65,6 +67,7 @@ pub fn main() {
                                             msg,
                                             connection.clone(),
                                             fireblocks.clone(),
+                                            fireblocks_supported_asset_ids,
                                             &rpc_client,
                                             producer,
                                         )
