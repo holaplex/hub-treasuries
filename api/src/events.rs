@@ -3,7 +3,7 @@ use fireblocks::objects::{
         CreateTransaction, ExtraParameters, RawMessageData, TransactionOperation,
         TransactionStatus, TransferPeerPath, UnsignedMessage,
     },
-    vault::CreateVault,
+    vault::{CreateVault, CreateVaultWallet},
 };
 use hex::FromHex;
 use hub_core::{prelude::*, producer::Producer, tokio::time, uuid::Uuid};
@@ -13,12 +13,15 @@ use solana_sdk::{signature::Signature, transaction::Transaction as SplTransactio
 
 use crate::{
     db::Connection,
-    entities::{customer_treasuries, project_treasuries, treasuries},
+    entities::{
+        customer_treasuries, project_treasuries, treasuries,
+        wallets::{self, AssetType},
+    },
     proto::{
         customer_events, nft_events,
         organization_events::{self},
         treasury_events::{
-            CustomerTreasury, DropCreated, DropMinted, {self},
+            CustomerTreasury, DropCreated, DropMinted, ProjectWallet, {self},
         },
         Customer, CustomerEventKey, NftEventKey, OrganizationEventKey, Project, Transaction,
         TreasuryEventKey, TreasuryEvents,
@@ -34,6 +37,7 @@ pub async fn process(
     msg: Services,
     db: Connection,
     fireblocks: fireblocks::Client,
+    supported_ids: Vec<String>,
     rpc: &RpcClient,
     producer: Producer<TreasuryEvents>,
 ) -> Result<()> {
@@ -47,7 +51,7 @@ pub async fn process(
         },
         Services::Organizations(key, e) => match e.event {
             Some(organization_events::Event::ProjectCreated(p)) => {
-                create_project_treasury(key, p, db, fireblocks).await
+                create_project_treasury(key, p, db, fireblocks, producer, supported_ids).await
             },
             Some(_) | None => Ok(()),
         },
@@ -110,7 +114,17 @@ pub async fn create_project_treasury(
     project: Project,
     conn: Connection,
     fireblocks: fireblocks::Client,
+    producer: Producer<TreasuryEvents>,
+    supported_ids: Vec<String>,
 ) -> Result<()> {
+    let user_id = Uuid::from_str(&k.user_id)?;
+
+    let asset_types: Vec<AssetType> = supported_ids
+        .iter()
+        .map(|a| AssetType::from_str(a))
+        .into_iter()
+        .collect::<Result<Vec<AssetType>>>()?;
+
     let create_vault = CreateVault {
         name: format!("project:{}", project.id.clone()),
         hidden_on_ui: None,
@@ -143,6 +157,42 @@ pub async fn create_project_treasury(
         .context("failed to insert project treasuries")?;
 
     info!("treasury created for project {:?}", project.id);
+
+    // create vault wallets for supported assets
+    for asset_type in asset_types {
+        let vault_asset = fireblocks
+            .create_vault_wallet(
+                treasury.vault_id.clone(),
+                asset_type.into(),
+                CreateVaultWallet {
+                    eos_account_name: None,
+                },
+            )
+            .await?;
+
+        let active_model = wallets::ActiveModel {
+            treasury_id: Set(treasury.id),
+            asset_id: Set(AssetType::from_str(&vault_asset.id)?),
+            address: Set(vault_asset.address),
+            legacy_address: Set(vault_asset.legacy_address),
+            tag: Set(vault_asset.tag),
+            created_by: Set(user_id),
+            ..Default::default()
+        };
+
+        active_model.insert(conn.get()).await?;
+
+        let event = treasury_events::Event::ProjectWalletCreated(ProjectWallet {
+            project_id: project.id.to_string(),
+        });
+
+        let event = TreasuryEvents { event: Some(event) };
+        let key = TreasuryEventKey {
+            id: treasury.id.to_string(),
+        };
+
+        producer.send(Some(&event), Some(&key)).await?;
+    }
 
     Ok(())
 }

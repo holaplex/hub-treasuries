@@ -123,6 +123,9 @@ pub struct Args {
     #[arg(short, long, env)]
     pub solana_endpoint: String,
 
+    #[arg(short, long, env, value_delimiter = ',')]
+    pub fireblocks_supported_asset_ids: Vec<String>,
+
     #[command(flatten)]
     pub db: db::DbArgs,
 
