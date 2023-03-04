@@ -13,7 +13,7 @@ use crate::{
         wallets::{self, AssetType},
     },
     proto::{
-        treasury_events::{self, CustomerWallet, ProjectWallet},
+        treasury_events::{self, Blockchain, CustomerWallet, ProjectWallet},
         TreasuryEventKey, TreasuryEvents,
     },
     AppContext, UserID,
@@ -87,7 +87,7 @@ impl Mutation {
         let active_model = wallets::ActiveModel {
             treasury_id: Set(treasury_id),
             asset_id: Set(AssetType::from_str(&vault_asset.id)?),
-            address: Set(vault_asset.address),
+            address: Set(vault_asset.address.clone()),
             legacy_address: Set(vault_asset.legacy_address),
             tag: Set(vault_asset.tag),
             created_by: Set(user_id),
@@ -103,14 +103,19 @@ impl Mutation {
                 CustomerWallet {
                     project_id: project_id.to_string(),
                     customer_id: customer_id.to_string(),
+                    blockchain: AssetType::from_str(&vault_asset.id)?.into(),
+                },
+            ))
+        } else if let Some(project_id) = treasury.project_project_id {
+            Some(treasury_events::Event::ProjectWalletCreated(
+                ProjectWallet {
+                    project_id: project_id.to_string(),
+                    wallet_address: vault_asset.address.clone(),
+                    blockchain: AssetType::from_str(&vault_asset.id)?.into(),
                 },
             ))
         } else {
-            treasury.project_project_id.map(|project_id| {
-                treasury_events::Event::ProjectWalletCreated(ProjectWallet {
-                    project_id: project_id.to_string(),
-                })
-            })
+            None
         };
 
         let event = TreasuryEvents { event };
@@ -133,4 +138,14 @@ pub struct CreateTreasuryWalletInput {
 #[derive(SimpleObject, Clone, Debug)]
 pub struct CreateTreasuryWalletPayload {
     pub wallet: wallets::Model,
+}
+
+impl From<AssetType> for Blockchain {
+    fn from(value: AssetType) -> Self {
+        match value {
+            AssetType::Solana | AssetType::SolanaTest => Blockchain::Solana,
+            AssetType::MaticTest | AssetType::Matic => Blockchain::Polygon,
+            AssetType::EthTest | AssetType::Eth => Blockchain::Ethereum,
+        }
+    }
 }

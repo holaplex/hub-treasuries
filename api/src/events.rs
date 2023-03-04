@@ -173,7 +173,7 @@ pub async fn create_project_treasury(
         let active_model = wallets::ActiveModel {
             treasury_id: Set(treasury.id),
             asset_id: Set(AssetType::from_str(&vault_asset.id)?),
-            address: Set(vault_asset.address),
+            address: Set(vault_asset.address.clone()),
             legacy_address: Set(vault_asset.legacy_address),
             tag: Set(vault_asset.tag),
             created_by: Set(user_id),
@@ -184,6 +184,8 @@ pub async fn create_project_treasury(
 
         let event = treasury_events::Event::ProjectWalletCreated(ProjectWallet {
             project_id: project.id.to_string(),
+            wallet_address: vault_asset.address,
+            blockchain: asset_type.into(),
         });
 
         let event = TreasuryEvents { event: Some(event) };
