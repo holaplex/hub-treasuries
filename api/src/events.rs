@@ -172,7 +172,7 @@ pub async fn create_project_treasury(
 
         let active_model = wallets::ActiveModel {
             treasury_id: Set(treasury.id),
-            asset_id: Set(AssetType::from_str(&vault_asset.id)?),
+            asset_id: Set(asset_type),
             address: Set(vault_asset.address.clone()),
             legacy_address: Set(vault_asset.legacy_address),
             tag: Set(vault_asset.tag),
