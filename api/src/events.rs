@@ -321,7 +321,7 @@ pub async fn create_raw_transaction(
 
     let project = Uuid::parse_str(&project_id)?;
     let note = Some(format!(
-        "Event:{:?},ID:{:?},ProjectID:{:?}",
+        "{:?} by {:?} for project {:?}",
         t.to_string(),
         k.user_id,
         project_id
