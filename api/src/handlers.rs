@@ -65,13 +65,11 @@ pub async fn fireblocks_webhook_handler(
     if let Ok(payload) = payload.into_json::<TransactionStatusUpdated>().await {
         let asset_id = AssetType::from_str(&payload.data.asset_id)?;
 
-        if payload.data.status == TransactionStatus::COMPLETED {
-            match asset_id {
-                AssetType::Solana | AssetType::SolanaTest => {
-                    submit_solana_transaction(db, producer, rpc, payload).await?;
-                },
-                _ => bail!("unsupported asset id"),
-            }
+        match asset_id {
+            AssetType::Solana | AssetType::SolanaTest => {
+                process_solana_transaction(db, producer, rpc, payload).await?;
+            },
+            _ => bail!("unsupported asset id"),
         }
     }
 
@@ -82,69 +80,73 @@ pub async fn fireblocks_webhook_handler(
 ///
 /// # Errors
 /// This function fails if ...
-pub async fn submit_solana_transaction(
+pub async fn process_solana_transaction(
     db: Data<&Connection>,
     producer: Data<&Producer<TreasuryEvents>>,
     rpc: Data<&Arc<RpcClient>>,
     payload: TransactionStatusUpdated,
 ) -> Result<()> {
-    let message = payload
-        .data
-        .signed_messages
-        .get(0)
-        .context("failed to get signed message")?
-        .content
-        .clone();
-
-    let Data(producer) = producer;
-    let message_bytes = hex::decode(message)?;
-
-    let message = bincode::deserialize_from(message_bytes.as_slice())?;
-
     let tx = Transactions::find_by_id(payload.data.id)
         .one(db.get())
         .await?
         .context("no signatures found")?;
 
-    let full_sig = payload
-        .data
-        .signed_messages
-        .get(0)
-        .context("failed to get signed message response")?
-        .clone()
-        .signature
-        .full_sig;
+    let mut signature = Signature::default();
+    let mut status = payload.data.status;
 
-    let signature_decoded = <[u8; 64]>::from_hex(full_sig)?;
+    if payload.data.status == TransactionStatus::COMPLETED {
+        let message = payload
+            .data
+            .signed_messages
+            .get(0)
+            .context("failed to get signed message")?
+            .content
+            .clone();
 
-    let signature = Signature::new(&signature_decoded);
+        let message_bytes = hex::decode(message)?;
 
-    let mut signatures = tx
-        .signed_message_signatures
-        .iter()
-        .map(|s| Signature::from_str(s).map_err(Into::into))
-        .collect::<Vec<Result<Signature>>>()
-        .into_iter()
-        .collect::<Result<Vec<Signature>>>()
-        .context("failed to parse signatures")?;
+        let message = bincode::deserialize_from(message_bytes.as_slice())?;
 
-    signatures.push(signature);
+        let full_sig = payload
+            .data
+            .signed_messages
+            .get(0)
+            .context("failed to get signed message response")?
+            .clone()
+            .signature
+            .full_sig;
 
-    let transaction = Transaction {
-        signatures,
-        message,
-    };
+        let signature_decoded = <[u8; 64]>::from_hex(full_sig)?;
 
-    let mut status = TransactionStatus::COMPLETED;
-    if rpc.send_transaction(&transaction).await.is_err() {
-        status = TransactionStatus::FAILED;
+        signature = Signature::new(&signature_decoded);
+
+        let mut signatures = tx
+            .signed_message_signatures
+            .iter()
+            .map(|s| Signature::from_str(s).map_err(Into::into))
+            .collect::<Vec<Result<Signature>>>()
+            .into_iter()
+            .collect::<Result<Vec<Signature>>>()
+            .context("failed to parse signatures")?;
+
+        signatures.push(signature);
+
+        let transaction = Transaction {
+            signatures,
+            message,
+        };
+
+        if rpc.send_transaction(&transaction).await.is_err() {
+            status = TransactionStatus::FAILED;
+        }
     }
+
     emit_event(
-        producer,
+        &producer,
         tx.event_id,
         tx.event_payload,
         status,
-        signature.to_string(),
+        Some(signature.to_string()),
     )
     .await?;
 
@@ -160,7 +162,7 @@ async fn emit_event(
     id: Vec<u8>,
     payload: Vec<u8>,
     status: TransactionStatus,
-    signature: String,
+    signature: Option<String>,
 ) -> Result<()> {
     let key: TreasuryEventKey = TreasuryEventKey::decode(id.as_slice())?;
     let treasury_event: TreasuryEvents = TreasuryEvents::decode(payload.as_slice())?;
@@ -168,11 +170,11 @@ async fn emit_event(
     match treasury_event.event.clone() {
         Some(Event::DropMinted(mut e)) => {
             e.status = status as i32;
-            e.tx_signature = signature;
+            e.tx_signature = signature.unwrap_or_default();
         },
         Some(Event::DropCreated(mut e)) => {
             e.status = status as i32;
-            e.tx_signature = signature;
+            e.tx_signature = signature.unwrap_or_default();
         },
         None | Some(_) => (),
     }
