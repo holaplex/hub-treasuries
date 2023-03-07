@@ -1,13 +1,30 @@
+use std::{str::FromStr, sync::Arc};
+
 use async_graphql::http::{playground_source, GraphQLPlaygroundConfig};
 use async_graphql_poem::{GraphQLRequest, GraphQLResponse};
-use hub_core::anyhow::Result;
+use fireblocks::objects::transaction::{TransactionStatus, TransactionStatusUpdated};
+use hex::FromHex;
+use hub_core::{
+    anyhow::{Context, Result},
+    prelude::bail,
+    producer::Producer,
+};
 use poem::{
     handler,
     web::{Data, Html},
-    IntoResponse,
+    IntoResponse, Request,
 };
+use prost::Message;
+use sea_orm::EntityTrait;
+use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_sdk::{signature::Signature, transaction::Transaction};
 
-use crate::{AppContext, AppState, UserID};
+use crate::{
+    db::Connection,
+    entities::{prelude::Transactions, wallets::AssetType},
+    proto::{treasury_events::Event, TreasuryEventKey, TreasuryEvents},
+    AppContext, AppState, UserID,
+};
 
 #[handler]
 pub fn health() {}
@@ -35,4 +52,133 @@ pub async fn graphql_handler(
         )
         .await
         .into())
+}
+
+#[handler]
+pub async fn fireblocks_webhook_handler(
+    db: Data<&Connection>,
+    producer: Data<&Producer<TreasuryEvents>>,
+    rpc: Data<&Arc<RpcClient>>,
+    payload: poem::Body,
+    _req: &Request,
+) -> Result<()> {
+    if let Ok(payload) = payload.into_json::<TransactionStatusUpdated>().await {
+        let asset_id = AssetType::from_str(&payload.data.asset_id)?;
+
+        if payload.data.status == TransactionStatus::COMPLETED {
+            match asset_id {
+                AssetType::Solana | AssetType::SolanaTest => {
+                    submit_solana_transaction(db, producer, rpc, payload).await?;
+                },
+                _ => bail!("unsupported asset id"),
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Res
+///
+/// # Errors
+/// This function fails if ...
+pub async fn submit_solana_transaction(
+    db: Data<&Connection>,
+    producer: Data<&Producer<TreasuryEvents>>,
+    rpc: Data<&Arc<RpcClient>>,
+    payload: TransactionStatusUpdated,
+) -> Result<()> {
+    let message = payload
+        .data
+        .signed_messages
+        .get(0)
+        .context("failed to get signed message")?
+        .content
+        .clone();
+
+    let Data(producer) = producer;
+    let message_bytes = hex::decode(message)?;
+
+    let message = bincode::deserialize_from(message_bytes.as_slice())?;
+
+    let tx = Transactions::find_by_id(payload.data.id)
+        .one(db.get())
+        .await?
+        .context("no signatures found")?;
+
+    let full_sig = payload
+        .data
+        .signed_messages
+        .get(0)
+        .context("failed to get signed message response")?
+        .clone()
+        .signature
+        .full_sig;
+
+    let signature_decoded = <[u8; 64]>::from_hex(full_sig)?;
+
+    let signature = Signature::new(&signature_decoded);
+
+    let mut signatures = tx
+        .signed_message_signatures
+        .iter()
+        .map(|s| Signature::from_str(s).map_err(Into::into))
+        .collect::<Vec<Result<Signature>>>()
+        .into_iter()
+        .collect::<Result<Vec<Signature>>>()
+        .context("failed to parse signatures")?;
+
+    signatures.push(signature);
+
+    let transaction = Transaction {
+        signatures,
+        message,
+    };
+
+    let mut status = TransactionStatus::COMPLETED;
+    if rpc.send_transaction(&transaction).await.is_err() {
+        status = TransactionStatus::FAILED;
+    }
+    emit_event(
+        producer,
+        tx.event_id,
+        tx.event_payload,
+        status,
+        signature.to_string(),
+    )
+    .await?;
+
+    Ok(())
+}
+
+/// Res
+///
+/// # Errors
+/// This function fails if ...
+async fn emit_event(
+    producer: &Producer<TreasuryEvents>,
+    id: Vec<u8>,
+    payload: Vec<u8>,
+    status: TransactionStatus,
+    signature: String,
+) -> Result<()> {
+    let key: TreasuryEventKey = TreasuryEventKey::decode(id.as_slice())?;
+    let treasury_event: TreasuryEvents = TreasuryEvents::decode(payload.as_slice())?;
+
+    match treasury_event.event.clone() {
+        Some(Event::DropMinted(mut e)) => {
+            e.status = status as i32;
+            e.tx_signature = signature;
+        },
+        Some(Event::DropCreated(mut e)) => {
+            e.status = status as i32;
+            e.tx_signature = signature;
+        },
+        None | Some(_) => (),
+    }
+
+    producer
+        .send(Some(&treasury_event), Some(&key))
+        .await
+        .map_err(Into::into)
 }

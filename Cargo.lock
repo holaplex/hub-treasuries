@@ -2229,6 +2229,7 @@ dependencies = [
  "hex",
  "holaplex-hub-core",
  "holaplex-hub-core-build",
+ "lazy_static",
  "poem",
  "prost 0.11.8",
  "sea-orm",

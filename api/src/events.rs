@@ -1,24 +1,24 @@
 use fireblocks::objects::{
     transaction::{
-        CreateTransaction, ExtraParameters, RawMessageData, TransactionOperation,
-        TransactionStatus, TransferPeerPath, UnsignedMessage,
+        CreateTransaction, CreateTransactionResponse, ExtraParameters, RawMessageData,
+        TransactionOperation, TransferPeerPath, UnsignedMessage,
     },
     vault::{CreateVault, CreateVaultWallet},
 };
-use hex::FromHex;
-use hub_core::{prelude::*, producer::Producer, tokio::time, uuid::Uuid};
+use hub_core::{prelude::*, producer::Producer, uuid::Uuid};
 use sea_orm::{prelude::*, JoinType, QuerySelect, Set};
-use solana_client::rpc_client::RpcClient;
-use solana_sdk::{signature::Signature, transaction::Transaction as SplTransaction};
 
 use crate::{
     db::Connection,
     entities::{
-        customer_treasuries, project_treasuries, treasuries,
+        customer_treasuries, project_treasuries,
+        sea_orm_active_enums::EventType,
+        transactions, treasuries,
         wallets::{self, AssetType},
     },
+    objects::{blockchain::Blockchain, BLOCKCHAIN_ASSET_IDS},
     proto::{
-        customer_events, nft_events,
+        self, customer_events, nft_events,
         organization_events::{self},
         treasury_events::{
             CustomerTreasury, DropCreated, DropMinted, ProjectWallet, {self},
@@ -38,7 +38,6 @@ pub async fn process(
     db: Connection,
     fireblocks: fireblocks::Client,
     supported_ids: Vec<String>,
-    rpc: &RpcClient,
     producer: Producer<TreasuryEvents>,
 ) -> Result<()> {
     // match topics
@@ -58,45 +57,73 @@ pub async fn process(
         Services::Nfts(key, e) => match e.event {
             // match topic messages
             Some(nft_events::Event::CreateDrop(payload)) => {
-                let status = create_raw_transaction(
+                let (transaction, signatures) = create_raw_transaction(
                     key.clone(),
                     payload.transaction.context("transaction not found")?,
                     payload.project_id.clone(),
-                    db,
+                    db.clone(),
                     fireblocks,
-                    rpc,
                     Transactions::CreateMasterEdition,
                 )
                 .await?;
 
-                emit_drop_created_event(producer, key.id, DropCreated {
-                    project_id: payload.project_id,
-                    status: status as i32,
-                })
-                .await
-                .context("failed to emit drop_created event")?;
+                let event = TreasuryEvents {
+                    event: Some(treasury_events::Event::DropCreated(DropCreated {
+                        project_id: payload.project_id,
+                        status: transaction.status as i32,
+                        tx_signature: String::default(),
+                    })),
+                };
+
+                let key = TreasuryEventKey { id: key.id };
+
+                let tx_am = transactions::ActiveModel {
+                    id: Set(transaction.id),
+                    status: Set(transaction.status.into()),
+                    signed_message_signatures: Set(signatures),
+                    full_signature: Set(None),
+                    event_type: Set(EventType::CreateDrop),
+                    event_id: Set(key.encode_to_vec()),
+                    event_payload: Set(event.encode_to_vec()),
+                };
+
+                tx_am.insert(db.get()).await?;
 
                 Ok(())
             },
             Some(nft_events::Event::MintDrop(payload)) => {
-                let status = create_raw_transaction(
+                let (transaction, signatures) = create_raw_transaction(
                     key.clone(),
                     payload.transaction.context("transaction not found")?,
                     payload.project_id.clone(),
-                    db,
+                    db.clone(),
                     fireblocks,
-                    rpc,
                     Transactions::MintEdition,
                 )
                 .await?;
 
-                emit_drop_minted_event(producer, key.id, DropMinted {
-                    project_id: payload.project_id,
-                    drop_id: payload.drop_id,
-                    status: status as i32,
-                })
-                .await
-                .context("failed to emit drop_created event")?;
+                let event = TreasuryEvents {
+                    event: Some(treasury_events::Event::DropMinted(DropMinted {
+                        project_id: payload.project_id,
+                        drop_id: payload.drop_id,
+                        status: transaction.status as i32,
+                        tx_signature: String::default(),
+                    })),
+                };
+
+                let key = TreasuryEventKey { id: key.id };
+
+                let tx_am = transactions::ActiveModel {
+                    id: Set(transaction.id),
+                    status: Set(transaction.status.into()),
+                    signed_message_signatures: Set(signatures),
+                    full_signature: Set(None),
+                    event_type: Set(EventType::CreateDrop),
+                    event_id: Set(key.encode_to_vec()),
+                    event_payload: Set(event.encode_to_vec()),
+                };
+
+                tx_am.insert(db.get()).await?;
 
                 Ok(())
             },
@@ -276,29 +303,31 @@ pub async fn create_raw_transaction(
     project_id: String,
     conn: Connection,
     fireblocks: fireblocks::Client,
-    rpc: &RpcClient,
     t: Transactions,
-) -> Result<TransactionStatus> {
+) -> Result<(CreateTransactionResponse, Vec<String>)> {
     let Transaction {
         serialized_message,
         signed_message_signatures,
+        blockchain,
     } = transaction;
 
+    let proto_blockchain_enum =
+        proto::Blockchain::from_i32(blockchain).context("failed to parse to blockchain enum")?;
+
+    let ids = BLOCKCHAIN_ASSET_IDS
+        .get(&proto_blockchain_enum.try_into()?)
+        .context("failed to get asset ids")?
+        .clone();
+
     let project = Uuid::parse_str(&project_id)?;
-    let payer_signature = signed_message_signatures
-        .get(0)
-        .context("failed to get payer signature")?;
-    let mint_signature = signed_message_signatures
-        .get(1)
-        .context("failed to get mint signature")?;
     let note = Some(format!(
-        "{:?} by {:?} for project {:?}",
+        "Event:{:?},ID:{:?},ProjectID:{:?}",
         t.to_string(),
         k.user_id,
         project_id
     ));
 
-    let vault = treasuries::Entity::find()
+    let treasury_model = treasuries::Entity::find()
         .join(
             JoinType::InnerJoin,
             treasuries::Relation::ProjectTreasuries.def(),
@@ -306,15 +335,24 @@ pub async fn create_raw_transaction(
         .filter(project_treasuries::Column::ProjectId.eq(project))
         .one(conn.get())
         .await?
-        .context("treasury not found in database")?
-        .vault_id;
+        .context("treasury not found in database")?;
+
+    let wallet = wallets::Entity::find()
+        .filter(
+            wallets::Column::AssetId
+                .is_in(ids)
+                .and(wallets::Column::TreasuryId.eq(treasury_model.id)),
+        )
+        .one(conn.get())
+        .await?
+        .context("treasury not found in database")?;
 
     let tx = CreateTransaction {
-        asset_id: "SOL_TEST".to_string(),
+        asset_id: wallet.asset_id.into(),
         operation: TransactionOperation::RAW,
         source: TransferPeerPath {
             peer_type: "VAULT_ACCOUNT".to_string(),
-            id: vault,
+            id: treasury_model.vault_id.to_string(),
         },
         destination: None,
         destinations: None,
@@ -329,87 +367,9 @@ pub async fn create_raw_transaction(
         note: note.clone(),
     };
 
-    let mut interval = time::interval(time::Duration::from_secs(30));
-
     let transaction = fireblocks.create_transaction(tx).await?;
 
-    let mut tx_details = fireblocks.get_transaction(transaction.id.clone()).await?;
-
-    for _ in 0..10 {
-        if !tx_details.clone().signed_messages.is_empty() {
-            break;
-        }
-        interval.tick().await;
-        tx_details = fireblocks.get_transaction(transaction.id.clone()).await?;
-    }
-
-    let full_sig = tx_details
-        .clone()
-        .signed_messages
-        .get(0)
-        .context("failed to get signed message response")?
-        .clone()
-        .signature
-        .full_sig;
-
-    // SIGNATURE LEN = 64 bytes
-
-    let signature_decoded = <[u8; 64]>::from_hex(full_sig)?;
-
-    let signature = Signature::new(&signature_decoded);
-
-    let decoded_message = bincode::deserialize(&serialized_message)?;
-
-    let signed_transaction = SplTransaction {
-        signatures: vec![
-            Signature::from_str(payer_signature)?,
-            Signature::from_str(mint_signature)?,
-            signature,
-        ],
-        message: decoded_message,
-    };
-
-    let res = rpc.send_transaction(&signed_transaction)?;
-
-    info!("{:?} signature {:?}", note, res);
-
-    Ok(tx_details.status)
-
-    // Ok(())
-}
-
-async fn emit_drop_created_event(
-    producer: Producer<TreasuryEvents>,
-    id: String,
-    payload: DropCreated,
-) -> Result<()> {
-    let event = TreasuryEvents {
-        event: Some(treasury_events::Event::DropCreated(payload)),
-    };
-
-    let key = TreasuryEventKey { id };
-
-    producer
-        .send(Some(&event), Some(&key))
-        .await
-        .map_err(Into::into)
-}
-
-async fn emit_drop_minted_event(
-    producer: Producer<TreasuryEvents>,
-    id: String,
-    payload: DropMinted,
-) -> Result<()> {
-    let event = TreasuryEvents {
-        event: Some(treasury_events::Event::DropMinted(payload)),
-    };
-
-    let key = TreasuryEventKey { id };
-
-    producer
-        .send(Some(&event), Some(&key))
-        .await
-        .map_err(Into::into)
+    Ok((transaction, signed_message_signatures))
 }
 
 #[derive(Debug)]
@@ -421,5 +381,18 @@ pub enum Transactions {
 impl fmt::Display for Transactions {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{self:?}")
+    }
+}
+
+impl TryFrom<proto::Blockchain> for Blockchain {
+    type Error = Error;
+
+    fn try_from(value: proto::Blockchain) -> Result<Self> {
+        match value {
+            proto::Blockchain::Unspecified => Err(anyhow!("Invalid enum variant")),
+            proto::Blockchain::Solana => Ok(Self::Solana),
+            proto::Blockchain::Polygon => Ok(Self::Polygon),
+            proto::Blockchain::Ethereum => Ok(Self::Ethereum),
+        }
     }
 }

@@ -123,6 +123,16 @@ pub struct UnsignedMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
 #[serde(rename_all = "camelCase")]
+pub struct TransactionStatusUpdated {
+    #[serde(rename = "type")]
+    pub status_type: String,
+    pub tenant_id: String,
+    pub timestamp: String,
+    pub data: TransactionDetails,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, SimpleObject)]
+#[serde(rename_all = "camelCase")]
 pub struct TransactionDetails {
     pub id: String,
     pub asset_id: String,

@@ -4,7 +4,7 @@ use holaplex_hub_treasuries::{
     build_schema,
     db::Connection,
     events,
-    handlers::{graphql_handler, health, playground},
+    handlers::{fireblocks_webhook_handler, graphql_handler, health, playground},
     proto, AppState, Args, Services,
 };
 use hub_core::{
@@ -28,6 +28,11 @@ pub fn main() {
             fireblocks,
         } = args;
 
+        let fireblocks::FbArgs {
+            fireblocks_webhook_endpoint,
+            ..
+        } = fireblocks;
+
         common.rt.block_on(async move {
             let connection = Connection::new(db)
                 .await
@@ -35,7 +40,7 @@ pub fn main() {
 
             let schema = build_schema();
             let fireblocks = fireblocks::Client::new(fireblocks)?;
-            let rpc_client = Arc::new(RpcClient::new(solana_endpoint));
+            let rpc_client = RpcClient::new(solana_endpoint).get_inner_client().clone();
             let producer = common.producer_cfg.build::<proto::TreasuryEvents>().await?;
 
             let state = AppState::new(
@@ -47,29 +52,30 @@ pub fn main() {
 
             let cons = common.consumer_cfg.build::<Services>().await?;
 
-            tokio::spawn(async move {
-                {
-                    let mut stream = cons.stream();
-                    loop {
-                        let fireblocks = fireblocks.clone();
-                        let connection = connection.clone();
-                        let rpc_client = rpc_client.clone();
-                        let fireblocks_supported_asset_ids = fireblocks_supported_asset_ids.clone();
-                        let producer = producer.clone();
+            let connection = connection.clone();
+
+            tokio::spawn({
+                let connection = connection.clone();
+                let producer = producer.clone();
+
+                async move {
+                    {
+                        let mut stream = cons.stream();
 
                         match stream.next().await {
                             Some(Ok(msg)) => {
                                 info!(?msg, "message received");
 
                                 tokio::spawn(async move {
+                                    let producer = producer.clone();
+
                                     {
                                         events::process(
                                             msg,
                                             connection.clone(),
                                             fireblocks.clone(),
                                             fireblocks_supported_asset_ids,
-                                            &rpc_client,
-                                            producer,
+                                            producer.clone(),
                                         )
                                         .await
                                     }
@@ -82,6 +88,24 @@ pub fn main() {
                             },
                         }
                     }
+                }
+            });
+
+            tokio::spawn(async move {
+                {
+                    let connection = connection.clone();
+                    Server::new(TcpListener::bind(fireblocks_webhook_endpoint))
+                        .run(
+                            Route::new().at(
+                                "/",
+                                post(fireblocks_webhook_handler)
+                                    .with(AddData::new(connection.clone()))
+                                    .with(AddData::new(producer.clone()))
+                                    .with(AddData::new(rpc_client)),
+                            ),
+                        )
+                        .await
+                        .context("failed to build server")
                 }
             });
 
