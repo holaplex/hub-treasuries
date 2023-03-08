@@ -30,23 +30,35 @@ impl Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_one = "super::customer_treasuries::Entity")]
-    CustomerTreasuries,
-    #[sea_orm(has_one = "super::project_treasuries::Entity")]
-    ProjectTreasuries,
+    #[sea_orm(
+        belongs_to = "super::customer_treasuries::Entity",
+        from = "Column::Id",
+        to = "super::customer_treasuries::Column::TreasuryId",
+        on_update = "Cascade",
+        on_delete = "Cascade"
+    )]
+    CustomerTreasury,
+    #[sea_orm(
+        belongs_to = "super::project_treasuries::Entity",
+        from = "Column::Id",
+        to = "super::project_treasuries::Column::TreasuryId",
+        on_update = "Cascade",
+        on_delete = "Cascade"
+    )]
+    ProjectTreasury,
     #[sea_orm(has_many = "super::wallets::Entity")]
     Wallets,
 }
 
 impl Related<super::customer_treasuries::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::CustomerTreasuries.def()
+        Relation::CustomerTreasury.def()
     }
 }
 
 impl Related<super::project_treasuries::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::ProjectTreasuries.def()
+        Relation::ProjectTreasury.def()
     }
 }
 

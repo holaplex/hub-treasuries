@@ -57,19 +57,17 @@ impl DataLoader<Uuid> for CustomerLoader {
     type Value = treasuries::Model;
 
     async fn load(&self, keys: &[Uuid]) -> Result<HashMap<Uuid, Self::Value>, Self::Error> {
-        let treasuries: Vec<(customer_treasuries::Model, Option<treasuries::Model>)> =
-            customer_treasuries::Entity::find()
-                .select_also(treasuries::Entity)
-                .join(
-                    JoinType::InnerJoin,
-                    treasuries::Relation::CustomerTreasuries.def(),
-                )
-                .filter(
-                    customer_treasuries::Column::CustomerId
-                        .is_in(keys.iter().map(ToOwned::to_owned)),
-                )
-                .all(self.db.get())
-                .await?;
+        let treasuries = customer_treasuries::Entity::find()
+            .join(
+                JoinType::InnerJoin,
+                customer_treasuries::Relation::Treasury.def(),
+            )
+            .select_also(treasuries::Entity)
+            .filter(
+                customer_treasuries::Column::CustomerId.is_in(keys.iter().map(ToOwned::to_owned)),
+            )
+            .all(self.db.get())
+            .await?;
 
         Ok(treasuries
             .into_iter()
@@ -98,18 +96,15 @@ impl DataLoader<Uuid> for ProjectLoader {
     type Value = treasuries::Model;
 
     async fn load(&self, keys: &[Uuid]) -> Result<HashMap<Uuid, Self::Value>, Self::Error> {
-        let treasuries: Vec<(project_treasuries::Model, Option<treasuries::Model>)> =
-            project_treasuries::Entity::find()
-                .select_also(treasuries::Entity)
-                .join(
-                    JoinType::InnerJoin,
-                    treasuries::Relation::CustomerTreasuries.def(),
-                )
-                .filter(
-                    project_treasuries::Column::ProjectId.is_in(keys.iter().map(ToOwned::to_owned)),
-                )
-                .all(self.db.get())
-                .await?;
+        let treasuries = project_treasuries::Entity::find()
+            .join(
+                JoinType::InnerJoin,
+                project_treasuries::Relation::Treasury.def(),
+            )
+            .select_also(treasuries::Entity)
+            .filter(project_treasuries::Column::ProjectId.is_in(keys.iter().map(ToOwned::to_owned)))
+            .all(self.db.get())
+            .await?;
 
         Ok(treasuries
             .into_iter()

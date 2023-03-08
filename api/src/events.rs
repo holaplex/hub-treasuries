@@ -301,7 +301,7 @@ pub async fn create_raw_transaction(
     let vault = treasuries::Entity::find()
         .join(
             JoinType::InnerJoin,
-            treasuries::Relation::ProjectTreasuries.def(),
+            treasuries::Relation::ProjectTreasury.def(),
         )
         .filter(project_treasuries::Column::ProjectId.eq(project))
         .one(conn.get())

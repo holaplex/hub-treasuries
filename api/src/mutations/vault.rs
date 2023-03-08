@@ -41,7 +41,7 @@ impl Mutation {
         let (customer_treasury, treasury) = customer_treasuries::Entity::find()
             .join(
                 JoinType::InnerJoin,
-                treasuries::Relation::CustomerTreasuries.def(),
+                customer_treasuries::Relation::Treasury.def(),
             )
             .filter(customer_treasuries::Column::CustomerId.eq(customer))
             .select_also(treasuries::Entity)
