@@ -64,10 +64,9 @@ pub async fn fireblocks_webhook_handler(
 ) -> Result<()> {
     if let Ok(payload) = payload.into_json::<TransactionStatusUpdated>().await {
         let asset_id = AssetType::from_str(&payload.data.asset_id)?;
-
         match asset_id {
             AssetType::Solana | AssetType::SolanaTest => {
-                process_solana_transaction(db, producer, rpc, payload).await?;
+                process_solana_transaction(&db, &producer, &rpc, payload).await?;
             },
             _ => bail!("unsupported asset id"),
         }
@@ -81,9 +80,9 @@ pub async fn fireblocks_webhook_handler(
 /// # Errors
 /// This function fails if ...
 pub async fn process_solana_transaction(
-    db: Data<&Connection>,
-    producer: Data<&Producer<TreasuryEvents>>,
-    rpc: Data<&Arc<RpcClient>>,
+    db: &Connection,
+    producer: &Producer<TreasuryEvents>,
+    rpc: &Arc<RpcClient>,
     payload: TransactionStatusUpdated,
 ) -> Result<()> {
     let tx = Transactions::find_by_id(payload.data.id)
@@ -124,8 +123,6 @@ pub async fn process_solana_transaction(
             .signed_message_signatures
             .iter()
             .map(|s| Signature::from_str(s).map_err(Into::into))
-            .collect::<Vec<Result<Signature>>>()
-            .into_iter()
             .collect::<Result<Vec<Signature>>>()
             .context("failed to parse signatures")?;
 
@@ -142,7 +139,7 @@ pub async fn process_solana_transaction(
     }
 
     emit_event(
-        &producer,
+        producer,
         tx.event_id,
         tx.event_payload,
         status,

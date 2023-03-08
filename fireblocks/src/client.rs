@@ -1,5 +1,3 @@
-use std::net::SocketAddr;
-
 use hub_core::{
     anyhow::{Context as _, Result},
     clap, serde_json,
@@ -33,10 +31,6 @@ pub struct FbArgs {
     /// Path of the fireblocks secret key file
     #[arg(long, env)]
     pub secret_path: String,
-
-    /// Fireblocks webhook endpoint
-    #[arg(long, default_value = "0.0.0.0:5000", env)]
-    pub fireblocks_webhook_endpoint: SocketAddr,
 }
 
 #[allow(missing_debug_implementations)]
@@ -58,7 +52,6 @@ impl Client {
             fireblocks_endpoint,
             fireblocks_api_key,
             secret_path,
-            ..
         } = args;
 
         let http = HttpClient::new();

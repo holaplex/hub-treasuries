@@ -28,11 +28,6 @@ pub fn main() {
             fireblocks,
         } = args;
 
-        let fireblocks::FbArgs {
-            fireblocks_webhook_endpoint,
-            ..
-        } = fireblocks;
-
         common.rt.block_on(async move {
             let connection = Connection::new(db)
                 .await
@@ -91,30 +86,19 @@ pub fn main() {
                 }
             });
 
-            tokio::spawn(async move {
-                {
-                    let connection = connection.clone();
-                    Server::new(TcpListener::bind(fireblocks_webhook_endpoint))
-                        .run(
-                            Route::new().at(
-                                "/",
-                                post(fireblocks_webhook_handler)
-                                    .with(AddData::new(connection.clone()))
-                                    .with(AddData::new(producer.clone()))
-                                    .with(AddData::new(rpc_client)),
-                            ),
-                        )
-                        .await
-                        .context("failed to build server")
-                }
-            });
-
             Server::new(TcpListener::bind(format!("0.0.0.0:{port}")))
                 .run(
                     Route::new()
                         .at("/graphql", post(graphql_handler).with(AddData::new(state)))
                         .at("/playground", get(playground))
-                        .at("/health", get(health)),
+                        .at("/health", get(health))
+                        .at(
+                            "/webhooks",
+                            post(fireblocks_webhook_handler)
+                                .with(AddData::new(connection))
+                                .with(AddData::new(producer))
+                                .with(AddData::new(rpc_client)),
+                        ),
                 )
                 .await
                 .context("failed to build graphql server")
