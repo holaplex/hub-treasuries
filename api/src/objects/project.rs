@@ -6,7 +6,6 @@ use crate::{entities::treasuries, AppContext};
 #[derive(Debug, Clone, SimpleObject)]
 #[graphql(complex)]
 pub struct Project {
-    #[graphql(external)]
     pub id: Uuid,
 }
 
