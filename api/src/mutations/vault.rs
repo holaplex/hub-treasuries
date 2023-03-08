@@ -23,15 +23,15 @@ impl Mutation {
     pub async fn create_customer_wallet(
         &self,
         ctx: &Context<'_>,
-        input: CreateCustomerWallet,
-    ) -> Result<CreateTreasuryWalletPayload> {
+        input: CreateCustomerWalletInput,
+    ) -> Result<CreateCustomerWalletPayload> {
         let AppContext { db, user_id, .. } = ctx.data::<AppContext>()?;
         let fireblocks = ctx.data::<FireblocksClient>()?;
         let conn = db.get();
         let producer = ctx.data::<Producer<TreasuryEvents>>()?;
 
         let UserID(id) = user_id;
-        let CreateCustomerWallet {
+        let CreateCustomerWalletInput {
             customer,
             asset_type,
         } = input;
@@ -88,18 +88,18 @@ impl Mutation {
 
         producer.send(Some(&event), Some(&key)).await?;
 
-        Ok(CreateTreasuryWalletPayload { wallet })
+        Ok(CreateCustomerWalletPayload { wallet })
     }
 }
 
 #[derive(InputObject, Clone, Debug)]
-pub struct CreateCustomerWallet {
+pub struct CreateCustomerWalletInput {
     pub customer: Uuid,
     pub asset_type: wallets::AssetType,
 }
 
 #[derive(SimpleObject, Clone, Debug)]
-pub struct CreateTreasuryWalletPayload {
+pub struct CreateCustomerWalletPayload {
     pub wallet: wallets::Model,
 }
 
