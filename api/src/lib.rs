@@ -17,7 +17,7 @@ use async_graphql::{
     extensions::{ApolloTracing, Logger},
     EmptySubscription, Schema,
 };
-use dataloaders::{CustomerTreasuryLoader, ProjectTreasuryLoader, WalletsLoader};
+use dataloaders::{CustomerTreasuryLoader, ProjectTreasuryLoader, TreasuryLoader, WalletsLoader};
 use db::Connection;
 use fireblocks::Client as FireblocksClient;
 use hub_core::{
@@ -164,6 +164,7 @@ pub struct AppContext {
     pub customer_treasury_loader: DataLoader<CustomerTreasuryLoader>,
     pub project_treasury_loader: DataLoader<ProjectTreasuryLoader>,
     pub wallets_loader: DataLoader<WalletsLoader>,
+    pub treasury_loader: DataLoader<TreasuryLoader>,
 }
 
 impl AppContext {
@@ -174,6 +175,7 @@ impl AppContext {
         let project_treasury_loader =
             DataLoader::new(ProjectTreasuryLoader::new(db.clone()), tokio::spawn);
         let wallets_loader = DataLoader::new(WalletsLoader::new(db.clone()), tokio::spawn);
+        let treasury_loader = DataLoader::new(TreasuryLoader::new(db.clone()), tokio::spawn);
 
         Self {
             db,
@@ -181,6 +183,7 @@ impl AppContext {
             customer_treasury_loader,
             project_treasury_loader,
             wallets_loader,
+            treasury_loader,
         }
     }
 }
