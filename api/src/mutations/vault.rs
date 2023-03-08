@@ -1,21 +1,13 @@
 use std::str::FromStr;
 
-use async_graphql::{self, Context, Error, InputObject, Object, Result, SimpleObject};
-use entities::prelude::*;
+use async_graphql::{Context, Error, InputObject, Object, Result, SimpleObject};
 use fireblocks::{objects::vault::CreateVaultWallet, Client as FireblocksClient};
 use hub_core::producer::Producer;
 use sea_orm::{prelude::*, JoinType, QuerySelect, Set};
 
 use crate::{
-    entities::{
-        self, customer_treasuries, project_treasuries,
-        treasuries::{self, TreasuryAndProjectIds},
-        wallets::{self, AssetType},
-    },
-    proto::{
-        treasury_events::{self, Blockchain, CustomerWallet, ProjectWallet},
-        TreasuryEventKey, TreasuryEvents,
-    },
+    entities::{customer_treasuries, treasuries, wallets},
+    proto::{treasury_events, TreasuryEventKey, TreasuryEvents},
     AppContext, UserID,
 };
 
@@ -28,51 +20,36 @@ impl Mutation {
     ///
     /// # Errors
     /// This function fails if ...
-    pub async fn create_treasury_wallet(
+    pub async fn create_customer_wallet(
         &self,
         ctx: &Context<'_>,
-        input: CreateTreasuryWalletInput,
+        input: CreateCustomerWallet,
     ) -> Result<CreateTreasuryWalletPayload> {
         let AppContext { db, user_id, .. } = ctx.data::<AppContext>()?;
         let fireblocks = ctx.data::<FireblocksClient>()?;
+        let conn = db.get();
         let producer = ctx.data::<Producer<TreasuryEvents>>()?;
 
         let UserID(id) = user_id;
-        let CreateTreasuryWalletInput {
-            treasury_id,
+        let CreateCustomerWallet {
+            customer,
             asset_type,
         } = input;
 
         let user_id = id.ok_or_else(|| Error::new("X-USER-ID header not found"))?;
 
-        // insert treasury to get the treasury id
-
-        let treasury = Treasuries::find_by_id(treasury_id)
-            .select_only()
-            .column(treasuries::Column::Id)
-            .column(treasuries::Column::VaultId)
-            .column_as(
-                customer_treasuries::Column::ProjectId,
-                "customer_project_id",
-            )
-            .column(customer_treasuries::Column::CustomerId)
-            .column_as(project_treasuries::Column::ProjectId, "project_project_id")
+        let (customer_treasury, treasury) = customer_treasuries::Entity::find()
             .join(
-                JoinType::LeftJoin,
-                treasuries::Relation::ProjectTreasuries.def(),
-            )
-            .join(
-                JoinType::LeftJoin,
+                JoinType::InnerJoin,
                 treasuries::Relation::CustomerTreasuries.def(),
             )
-            .into_model::<TreasuryAndProjectIds>()
-            .one(db.get())
+            .filter(customer_treasuries::Column::CustomerId.eq(customer))
+            .select_also(treasuries::Entity)
+            .one(conn)
             .await?
-            .ok_or_else(|| Error::new("failed to load treasury"))?;
+            .ok_or_else(|| Error::new("customer treasury not found"))?;
 
-        if treasury.customer_project_id.is_none() || treasury.project_project_id.is_none() {
-            return Err(Error::new("customer or project treasury not found"));
-        }
+        let treasury = treasury.ok_or_else(|| Error::new("treasury not found"))?;
 
         let vault_asset = fireblocks
             .create_vault_wallet(
@@ -85,7 +62,7 @@ impl Mutation {
             .await?;
 
         let active_model = wallets::ActiveModel {
-            treasury_id: Set(treasury_id),
+            treasury_id: Set(treasury.id),
             asset_id: Set(asset_type),
             address: Set(vault_asset.address.clone()),
             legacy_address: Set(vault_asset.legacy_address),
@@ -94,31 +71,17 @@ impl Mutation {
             ..Default::default()
         };
 
-        let wallet = active_model.insert(db.get()).await?;
+        let wallet = active_model.insert(conn).await?;
 
-        let event = if let (Some(project_id), Some(customer_id)) =
-            (treasury.customer_project_id, treasury.customer_id)
-        {
-            Some(treasury_events::Event::CustomerWalletCreated(
-                CustomerWallet {
-                    project_id: project_id.to_string(),
-                    customer_id: customer_id.to_string(),
-                    blockchain: AssetType::from_str(&vault_asset.id)?.into(),
+        let event = TreasuryEvents {
+            event: Some(treasury_events::Event::CustomerWalletCreated(
+                treasury_events::CustomerWallet {
+                    project_id: customer_treasury.project_id.to_string(),
+                    customer_id: customer_treasury.customer_id.to_string(),
+                    blockchain: wallets::AssetType::from_str(&vault_asset.id)?.into(),
                 },
-            ))
-        } else if let Some(project_id) = treasury.project_project_id {
-            Some(treasury_events::Event::ProjectWalletCreated(
-                ProjectWallet {
-                    project_id: project_id.to_string(),
-                    wallet_address: vault_asset.address.clone(),
-                    blockchain: AssetType::from_str(&vault_asset.id)?.into(),
-                },
-            ))
-        } else {
-            None
+            )),
         };
-
-        let event = TreasuryEvents { event };
         let key = TreasuryEventKey {
             id: treasury.id.to_string(),
         };
@@ -130,9 +93,9 @@ impl Mutation {
 }
 
 #[derive(InputObject, Clone, Debug)]
-pub struct CreateTreasuryWalletInput {
-    pub treasury_id: Uuid,
-    pub asset_type: AssetType,
+pub struct CreateCustomerWallet {
+    pub customer: Uuid,
+    pub asset_type: wallets::AssetType,
 }
 
 #[derive(SimpleObject, Clone, Debug)]
@@ -140,12 +103,18 @@ pub struct CreateTreasuryWalletPayload {
     pub wallet: wallets::Model,
 }
 
-impl From<AssetType> for Blockchain {
-    fn from(value: AssetType) -> Self {
+impl From<wallets::AssetType> for treasury_events::Blockchain {
+    fn from(value: wallets::AssetType) -> Self {
         match value {
-            AssetType::Solana | AssetType::SolanaTest => Blockchain::Solana,
-            AssetType::MaticTest | AssetType::Matic => Blockchain::Polygon,
-            AssetType::EthTest | AssetType::Eth => Blockchain::Ethereum,
+            wallets::AssetType::Solana | wallets::AssetType::SolanaTest => {
+                treasury_events::Blockchain::Solana
+            },
+            wallets::AssetType::MaticTest | wallets::AssetType::Matic => {
+                treasury_events::Blockchain::Polygon
+            },
+            wallets::AssetType::EthTest | wallets::AssetType::Eth => {
+                treasury_events::Blockchain::Ethereum
+            },
         }
     }
 }

@@ -329,22 +329,23 @@ pub async fn create_raw_transaction(
         note: note.clone(),
     };
 
-    let mut interval = time::interval(time::Duration::from_secs(30));
+    let mut interval = time::interval(time::Duration::from_millis(250));
 
     let transaction = fireblocks.create_transaction(tx).await?;
 
-    let mut tx_details = fireblocks.get_transaction(transaction.id.clone()).await?;
+    let tx_details = loop {
+        let tx_details = fireblocks.get_transaction(transaction.id.clone()).await?;
 
-    for _ in 0..10 {
-        if !tx_details.clone().signed_messages.is_empty() {
-            break;
+        if tx_details.clone().signed_messages.is_empty() {
+            interval.tick().await;
+
+            continue;
         }
-        interval.tick().await;
-        tx_details = fireblocks.get_transaction(transaction.id.clone()).await?;
-    }
+
+        break tx_details;
+    };
 
     let full_sig = tx_details
-        .clone()
         .signed_messages
         .get(0)
         .context("failed to get signed message response")?
