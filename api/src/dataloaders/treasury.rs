@@ -10,6 +10,36 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
+pub struct Loader {
+    pub db: Connection,
+}
+
+impl Loader {
+    #[must_use]
+    pub fn new(db: Connection) -> Self {
+        Self { db }
+    }
+}
+
+#[async_trait]
+impl DataLoader<Uuid> for Loader {
+    type Error = FieldError;
+    type Value = treasuries::Model;
+
+    async fn load(&self, keys: &[Uuid]) -> Result<HashMap<Uuid, Self::Value>, Self::Error> {
+        let treasuries = treasuries::Entity::find()
+            .filter(treasuries::Column::Id.is_in(keys.iter().map(ToOwned::to_owned)))
+            .all(self.db.get())
+            .await?;
+
+        Ok(treasuries
+            .into_iter()
+            .map(|treasury| (treasury.id, treasury))
+            .collect())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct CustomerLoader {
     pub db: Connection,
 }

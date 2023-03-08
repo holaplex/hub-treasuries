@@ -2,6 +2,7 @@ mod treasury;
 mod wallet;
 
 pub use treasury::{
-    CustomerLoader as CustomerTreasuryLoader, ProjectLoader as ProjectTreasuryLoader,
+    CustomerLoader as CustomerTreasuryLoader, Loader as TreasuryLoader,
+    ProjectLoader as ProjectTreasuryLoader,
 };
 pub use wallet::WalletsLoader;
