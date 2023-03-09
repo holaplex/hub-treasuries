@@ -78,7 +78,7 @@ impl Mutation {
                 treasury_events::CustomerWallet {
                     project_id: customer_treasury.project_id.to_string(),
                     customer_id: customer_treasury.customer_id.to_string(),
-                    blockchain: wallets::AssetType::from_str(&vault_asset.id)?.into(),
+                    blockchain: asset_type.into(),
                 },
             )),
         };
