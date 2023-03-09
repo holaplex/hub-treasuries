@@ -8,7 +8,11 @@ use fireblocks::objects::{
 use hex::FromHex;
 use hub_core::{prelude::*, producer::Producer, tokio::time, uuid::Uuid};
 use sea_orm::{prelude::*, JoinType, QuerySelect, Set};
-use solana_client::rpc_client::RpcClient;
+use solana_client::{
+    client_error::{ClientError, ClientErrorKind},
+    rpc_client::RpcClient,
+    rpc_request::RpcError,
+};
 use solana_sdk::{signature::Signature, transaction::Transaction as SplTransaction};
 
 use crate::{
@@ -19,6 +23,7 @@ use crate::{
     },
     proto::{
         customer_events, nft_events,
+        nft_events::Event::CreateCollectionNft,
         organization_events::{self},
         treasury_events::{
             CustomerTreasury, DropCreated, DropMinted, ProjectWallet, {self},
@@ -58,7 +63,7 @@ pub async fn process(
         Services::Nfts(key, e) => match e.event {
             // match topic messages
             Some(nft_events::Event::CreateDrop(payload)) => {
-                let status = create_raw_transaction(
+                let (status, sig) = create_raw_transaction(
                     key.clone(),
                     payload.transaction.context("transaction not found")?,
                     payload.project_id.clone(),
@@ -72,6 +77,7 @@ pub async fn process(
                 emit_drop_created_event(producer, key.id, DropCreated {
                     project_id: payload.project_id,
                     status: status as i32,
+                    tx_signature: sig.to_string(),
                 })
                 .await
                 .context("failed to emit drop_created event")?;
@@ -79,7 +85,7 @@ pub async fn process(
                 Ok(())
             },
             Some(nft_events::Event::MintDrop(payload)) => {
-                let status = create_raw_transaction(
+                let (status, sig) = create_raw_transaction(
                     key.clone(),
                     payload.transaction.context("transaction not found")?,
                     payload.project_id.clone(),
@@ -94,9 +100,24 @@ pub async fn process(
                     project_id: payload.project_id,
                     drop_id: payload.drop_id,
                     status: status as i32,
+                    tx_signature: sig.to_string(),
                 })
                 .await
                 .context("failed to emit drop_created event")?;
+
+                Ok(())
+            },
+            Some(CreateCollectionNft(payload)) => {
+                create_raw_transaction(
+                    key.clone(),
+                    payload.transaction.context("transaction not found")?,
+                    payload.project_id.clone(),
+                    db,
+                    fireblocks,
+                    rpc,
+                    Transactions::MintEdition,
+                )
+                .await?;
 
                 Ok(())
             },
@@ -278,10 +299,11 @@ pub async fn create_raw_transaction(
     fireblocks: fireblocks::Client,
     rpc: &RpcClient,
     t: Transactions,
-) -> Result<TransactionStatus> {
+) -> Result<(TransactionStatus, Signature)> {
     let Transaction {
         serialized_message,
         signed_message_signatures,
+        ..
     } = transaction;
 
     let project = Uuid::parse_str(&project_id)?;
@@ -298,23 +320,23 @@ pub async fn create_raw_transaction(
         project_id
     ));
 
-    let vault = treasuries::Entity::find()
-        .join(
-            JoinType::InnerJoin,
-            treasuries::Relation::ProjectTreasury.def(),
-        )
-        .filter(project_treasuries::Column::ProjectId.eq(project))
-        .one(conn.get())
-        .await?
-        .context("treasury not found in database")?
-        .vault_id;
+    // let vault = treasuries::Entity::find()
+    //     .join(
+    //         JoinType::InnerJoin,
+    //         treasuries::Relation::ProjectTreasury.def(),
+    //     )
+    //     .filter(project_treasuries::Column::ProjectId.eq(project))
+    //     .one(conn.get())
+    //     .await?
+    //     .context("treasury not found in database")?
+    //     .vault_id;
 
     let tx = CreateTransaction {
         asset_id: "SOL_TEST".to_string(),
         operation: TransactionOperation::RAW,
         source: TransferPeerPath {
             peer_type: "VAULT_ACCOUNT".to_string(),
-            id: vault,
+            id: "51".to_string(),
         },
         destination: None,
         destinations: None,
@@ -329,7 +351,7 @@ pub async fn create_raw_transaction(
         note: note.clone(),
     };
 
-    let mut interval = time::interval(time::Duration::from_millis(250));
+    let mut interval = time::interval(time::Duration::from_secs(2));
 
     let transaction = fireblocks.create_transaction(tx).await?;
 
@@ -374,7 +396,7 @@ pub async fn create_raw_transaction(
 
     info!("{:?} signature {:?}", note, res);
 
-    Ok(tx_details.status)
+    Ok((tx_details.status, signature))
 
     // Ok(())
 }
