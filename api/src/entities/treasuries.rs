@@ -26,6 +26,20 @@ impl Model {
 
         wallets_loader.load_one(self.id).await
     }
+
+    async fn wallet(
+        &self,
+        ctx: &Context<'_>,
+        asset_type: wallets::AssetType,
+    ) -> Result<Option<wallets::Model>> {
+        let AppContext { wallets_loader, .. } = ctx.data::<AppContext>()?;
+
+        let wallets = wallets_loader.load_one(self.id).await?.unwrap_or_default();
+
+        Ok(wallets
+            .into_iter()
+            .find(|wallet| wallet.asset_id == asset_type))
+    }
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

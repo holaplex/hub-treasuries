@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use async_graphql::{Context, Error, InputObject, Object, Result, SimpleObject};
 use fireblocks::{objects::vault::CreateVaultWallet, Client as FireblocksClient};
 use hub_core::producer::Producer;
