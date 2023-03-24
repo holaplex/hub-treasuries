@@ -11,6 +11,7 @@ pub struct Customer {
 
 #[ComplexObject]
 impl Customer {
+    /// The treasury assigned to the customer, which contains the customer's wallets.
     pub async fn treasury(&self, ctx: &Context<'_>) -> Result<Option<treasuries::Model>> {
         let AppContext {
             customer_treasury_loader,

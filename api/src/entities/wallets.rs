@@ -11,24 +11,34 @@ const MATIC_TEST: &str = "MATIC_TEST";
 const ETH_TEST: &str = "ETH_TEST";
 const ETH: &str = "ETH";
 
+/// Fireblocks-defined blockchain identifiers.
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
 #[sea_orm(rs_type = "i32", db_type = "Integer")]
 pub enum AssetType {
+    /// Mainnet Solana
     #[graphql(name = "SOL")]
     #[sea_orm(num_value = 0)]
     Solana,
+    /// Devnet Solana
+    /// Note: Holaplex uses `SOL_TEST` for provisioning wallets on its staging environment but still submits transactions to mainnet.
     #[graphql(name = "SOL_TEST")]
     #[sea_orm(num_value = 1)]
     SolanaTest,
+    /// Ploygon Mumbai Testnet
+    /// Note: Holaplex uses `MATIC_TEST` for provisioning wallets on its staging environment but still submits transactions to mainnet.
     #[graphql(name = "MATIC_TEST")]
     #[sea_orm(num_value = 2)]
     MaticTest,
+    /// Mainnet Polygon
     #[graphql(name = "MATIC")]
     #[sea_orm(num_value = 3)]
     Matic,
+    // Ethereum Testnet
+    /// Note: Holaplex uses `ETH_TEST` for provisioning wallets on its staging environment but still submits transactions to mainnet.
     #[graphql(name = "ETH_TEST")]
     #[sea_orm(num_value = 4)]
     EthTest,
+    /// Ethereum Mainnet
     #[graphql(name = "ETH")]
     #[sea_orm(num_value = 5)]
     Eth,
@@ -82,13 +92,18 @@ impl FromStr for AssetType {
     }
 }
 
+/// A blockchain wallet.
+/// # Description
+/// A blockchain wallet is a digital wallet that allows users to securely store, manage, and transfer their cryptocurrencies or other digital assets on a blockchain network.
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, SimpleObject)]
 #[sea_orm(table_name = "wallets")]
 #[graphql(concrete(name = "Wallet", params()))]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub treasury_id: Uuid,
+    /// The wallet's associated blockchain.
     pub asset_id: AssetType,
+    /// The wallet address.
     #[sea_orm(primary_key, auto_increment = false)]
     pub address: String,
     pub legacy_address: String,

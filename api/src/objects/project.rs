@@ -11,6 +11,7 @@ pub struct Project {
 
 #[ComplexObject]
 impl Project {
+    /// The treasury assigned to the project, which contains the project's wallets.
     pub async fn treasury(&self, ctx: &Context<'_>) -> Result<Option<treasuries::Model>> {
         let AppContext {
             project_treasury_loader,
