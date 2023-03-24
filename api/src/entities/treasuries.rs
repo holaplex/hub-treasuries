@@ -7,26 +7,34 @@ use serde::{Deserialize, Serialize};
 use super::wallets;
 use crate::AppContext;
 
+/// A collection of wallets assigned to different entities in the Holaplex ecosystem.
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq, Serialize, Deserialize, SimpleObject)]
 #[sea_orm(table_name = "treasuries")]
 #[graphql(complex, concrete(name = "Treasury", params()))]
 pub struct Model {
+    /// The unique identifier for the treasury.
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
+    /// The associated Fireblocks vault ID.
+    /// ## Reference
+    /// [Vault Objects](https://docs.fireblocks.com/api/#vault-objects)
     #[sea_orm(unique)]
     pub vault_id: String,
+    /// The creation datetime of the vault.
     pub created_at: DateTime,
 }
 
 #[ComplexObject]
 
 impl Model {
+    /// The treasury's associated wallets.
     async fn wallets(&self, ctx: &Context<'_>) -> Result<Option<Vec<wallets::Model>>> {
         let AppContext { wallets_loader, .. } = ctx.data::<AppContext>()?;
 
         wallets_loader.load_one(self.id).await
     }
 
+    /// Lookup a wallet based on its `asset_type`.
     async fn wallet(
         &self,
         ctx: &Context<'_>,

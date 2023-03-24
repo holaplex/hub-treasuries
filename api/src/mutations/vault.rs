@@ -14,10 +14,10 @@ pub struct Mutation;
 
 #[Object(name = "VaultMutation")]
 impl Mutation {
-    /// Res
+    /// Create a wallet for a customer and assign it to the customer's treasury account.
     ///
     /// # Errors
-    /// This function fails if ...
+    /// The mutation will result in an error if it is unable to interact with the database or communicate with Fireblocks.
     pub async fn create_customer_wallet(
         &self,
         ctx: &Context<'_>,
@@ -90,14 +90,19 @@ impl Mutation {
     }
 }
 
+/// Input for creating a customer wallet.
 #[derive(InputObject, Clone, Debug)]
 pub struct CreateCustomerWalletInput {
+    /// The customer ID.
     pub customer: Uuid,
+    /// Blockchain for wallet creation.
     pub asset_type: wallets::AssetType,
 }
 
+/// Response after wallet creation.
 #[derive(SimpleObject, Clone, Debug)]
 pub struct CreateCustomerWalletPayload {
+    // The wallet that was just created.
     pub wallet: wallets::Model,
 }
 
