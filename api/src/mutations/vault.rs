@@ -82,6 +82,7 @@ impl Mutation {
         };
         let key = TreasuryEventKey {
             id: treasury.id.to_string(),
+            user_id: user_id.to_string(),
         };
 
         producer.send(Some(&event), Some(&key)).await?;
