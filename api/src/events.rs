@@ -110,7 +110,7 @@ pub async fn process(
                     db,
                     fireblocks,
                     rpc,
-                    Transactions::MintEdition,
+                    Transactions::UpdateMetadata,
                 )
                 .await?;
 
@@ -468,6 +468,7 @@ async fn emit_drop_updated_event(
 pub enum Transactions {
     CreateMasterEdition,
     MintEdition,
+    UpdateMetadata,
 }
 
 impl fmt::Display for Transactions {
