@@ -88,7 +88,7 @@ impl CustomerTreasuryWalletLoader {
 #[async_trait]
 impl DataLoader<Uuid> for CustomerTreasuryWalletLoader {
     type Error = FieldError;
-    type Value = wallets::Model;
+    type Value = Vec<wallets::Model>;
 
     async fn load(&self, keys: &[Uuid]) -> Result<HashMap<Uuid, Self::Value>, Self::Error> {
         let wallets = customer_treasuries::Entity::find()
@@ -99,7 +99,7 @@ impl DataLoader<Uuid> for CustomerTreasuryWalletLoader {
                     .to(wallets::Column::TreasuryId)
                     .into(),
             )
-            .select_also(wallets::Entity)
+            .select_with(wallets::Entity)
             .filter(
                 customer_treasuries::Column::CustomerId.is_in(keys.iter().map(ToOwned::to_owned)),
             )
@@ -108,7 +108,7 @@ impl DataLoader<Uuid> for CustomerTreasuryWalletLoader {
 
         Ok(wallets
             .into_iter()
-            .filter_map(|(ct, w)| w.map(|w| (ct.customer_id, w)))
+            .map(|(ct, wallets)| (ct.customer_id, wallets))
             .collect())
     }
 }
