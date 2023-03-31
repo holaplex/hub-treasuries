@@ -5,4 +5,4 @@ pub use treasury::{
     CustomerLoader as CustomerTreasuryLoader, Loader as TreasuryLoader,
     ProjectLoader as ProjectTreasuryLoader,
 };
-pub use wallet::WalletsLoader;
+pub use wallet::{CustomerTreasuryWalletLoader, TreasuryWalletsLoader, WalletLoader};

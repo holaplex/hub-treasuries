@@ -29,9 +29,12 @@ pub struct Model {
 impl Model {
     /// The treasury's associated wallets.
     async fn wallets(&self, ctx: &Context<'_>) -> Result<Option<Vec<wallets::Model>>> {
-        let AppContext { wallets_loader, .. } = ctx.data::<AppContext>()?;
+        let AppContext {
+            treasury_wallets_loader,
+            ..
+        } = ctx.data::<AppContext>()?;
 
-        wallets_loader.load_one(self.id).await
+        treasury_wallets_loader.load_one(self.id).await
     }
 
     /// Lookup a wallet based on its `asset_type`.
@@ -40,9 +43,15 @@ impl Model {
         ctx: &Context<'_>,
         asset_type: wallets::AssetType,
     ) -> Result<Option<wallets::Model>> {
-        let AppContext { wallets_loader, .. } = ctx.data::<AppContext>()?;
+        let AppContext {
+            treasury_wallets_loader,
+            ..
+        } = ctx.data::<AppContext>()?;
 
-        let wallets = wallets_loader.load_one(self.id).await?.unwrap_or_default();
+        let wallets = treasury_wallets_loader
+            .load_one(self.id)
+            .await?
+            .unwrap_or_default();
 
         Ok(wallets
             .into_iter()

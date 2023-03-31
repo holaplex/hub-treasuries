@@ -17,7 +17,10 @@ use async_graphql::{
     extensions::{ApolloTracing, Logger},
     EmptySubscription, Schema,
 };
-use dataloaders::{CustomerTreasuryLoader, ProjectTreasuryLoader, TreasuryLoader, WalletsLoader};
+use dataloaders::{
+    CustomerTreasuryLoader, CustomerTreasuryWalletLoader, ProjectTreasuryLoader, TreasuryLoader,
+    TreasuryWalletsLoader, WalletLoader,
+};
 use db::Connection;
 use fireblocks::Client as FireblocksClient;
 use hub_core::{
@@ -163,7 +166,9 @@ pub struct AppContext {
     pub user_id: UserID,
     pub customer_treasury_loader: DataLoader<CustomerTreasuryLoader>,
     pub project_treasury_loader: DataLoader<ProjectTreasuryLoader>,
-    pub wallets_loader: DataLoader<WalletsLoader>,
+    pub wallet_loader: DataLoader<WalletLoader>,
+    pub treasury_wallets_loader: DataLoader<TreasuryWalletsLoader>,
+    pub customer_treasury_wallet_loader: DataLoader<CustomerTreasuryWalletLoader>,
     pub treasury_loader: DataLoader<TreasuryLoader>,
 }
 
@@ -174,7 +179,11 @@ impl AppContext {
             DataLoader::new(CustomerTreasuryLoader::new(db.clone()), tokio::spawn);
         let project_treasury_loader =
             DataLoader::new(ProjectTreasuryLoader::new(db.clone()), tokio::spawn);
-        let wallets_loader = DataLoader::new(WalletsLoader::new(db.clone()), tokio::spawn);
+        let wallet_loader = DataLoader::new(WalletLoader::new(db.clone()), tokio::spawn);
+        let treasury_wallets_loader =
+            DataLoader::new(TreasuryWalletsLoader::new(db.clone()), tokio::spawn);
+        let customer_treasury_wallet_loader =
+            DataLoader::new(CustomerTreasuryWalletLoader::new(db.clone()), tokio::spawn);
         let treasury_loader = DataLoader::new(TreasuryLoader::new(db.clone()), tokio::spawn);
 
         Self {
@@ -182,7 +191,9 @@ impl AppContext {
             user_id,
             customer_treasury_loader,
             project_treasury_loader,
-            wallets_loader,
+            wallet_loader,
+            treasury_wallets_loader,
+            customer_treasury_wallet_loader,
             treasury_loader,
         }
     }

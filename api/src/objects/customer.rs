@@ -1,7 +1,10 @@
 use async_graphql::{ComplexObject, Context, Result, SimpleObject};
 use hub_core::uuid::Uuid;
 
-use crate::{entities::treasuries, AppContext};
+use crate::{
+    entities::{treasuries, wallets},
+    AppContext,
+};
 
 #[derive(Debug, Clone, SimpleObject)]
 #[graphql(complex)]
@@ -19,5 +22,14 @@ impl Customer {
         } = ctx.data::<AppContext>()?;
 
         customer_treasury_loader.load_one(self.id).await
+    }
+
+    pub async fn wallet(&self, ctx: &Context<'_>) -> Result<Option<wallets::Model>> {
+        let AppContext {
+            customer_treasury_wallet_loader,
+            ..
+        } = ctx.data::<AppContext>()?;
+
+        customer_treasury_wallet_loader.load_one(self.id).await
     }
 }
