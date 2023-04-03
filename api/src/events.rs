@@ -47,7 +47,7 @@ pub async fn process(
             Some(customer_events::Event::Created(customer)) => {
                 create_customer_treasury(db, fireblocks, producer, key, customer).await
             },
-            Some(_) | None => Ok(()),
+            None => Ok(()),
         },
         Services::Organizations(key, e) => match e.event {
             Some(organization_events::Event::ProjectCreated(p)) => {
@@ -317,7 +317,7 @@ pub async fn create_raw_transaction(
     let mut signed_signatures = signed_message_signatures
         .iter()
         .map(|s| {
-            Signature::from_str(s).map_err(|e| anyhow!(format!("failed to parse signature: {}", e)))
+            Signature::from_str(s).map_err(|e| anyhow!(format!("failed to parse signature: {e}")))
         })
         .collect::<Result<Vec<Signature>>>()?;
 
