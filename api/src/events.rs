@@ -21,7 +21,7 @@ use crate::{
         customer_events, nft_events,
         organization_events::{self},
         treasury_events::{
-            CustomerTreasury, DropCreated, DropMinted, ProjectWallet, {self},
+            CustomerTreasury, DropCreated, DropMinted, DropUpdated, ProjectWallet, {self},
         },
         Customer, CustomerEventKey, NftEventKey, OrganizationEventKey, Project, Transaction,
         TreasuryEventKey, TreasuryEvents,
@@ -58,7 +58,7 @@ pub async fn process(
         Services::Nfts(key, e) => match e.event {
             // match topic messages
             Some(nft_events::Event::CreateDrop(payload)) => {
-                let status = create_raw_transaction(
+                let (status, sig) = create_raw_transaction(
                     key.clone(),
                     payload.transaction.context("transaction not found")?,
                     payload.project_id.clone(),
@@ -69,9 +69,10 @@ pub async fn process(
                 )
                 .await?;
 
-                emit_drop_created_event(producer, key.id, DropCreated {
+                emit_drop_created_event(producer, key, DropCreated {
                     project_id: payload.project_id,
                     status: status as i32,
+                    tx_signature: sig.to_string(),
                 })
                 .await
                 .context("failed to emit drop_created event")?;
@@ -79,7 +80,7 @@ pub async fn process(
                 Ok(())
             },
             Some(nft_events::Event::MintDrop(payload)) => {
-                let status = create_raw_transaction(
+                let (status, sig) = create_raw_transaction(
                     key.clone(),
                     payload.transaction.context("transaction not found")?,
                     payload.project_id.clone(),
@@ -90,10 +91,34 @@ pub async fn process(
                 )
                 .await?;
 
-                emit_drop_minted_event(producer, key.id, DropMinted {
+                emit_drop_minted_event(producer, key, DropMinted {
                     project_id: payload.project_id,
                     drop_id: payload.drop_id,
                     status: status as i32,
+                    tx_signature: sig.to_string(),
+                })
+                .await
+                .context("failed to emit drop_created event")?;
+
+                Ok(())
+            },
+            Some(nft_events::Event::UpdateMetadata(payload)) => {
+                let (status, sig) = create_raw_transaction(
+                    key.clone(),
+                    payload.transaction.context("transaction not found")?,
+                    payload.project_id.clone(),
+                    db,
+                    fireblocks,
+                    rpc,
+                    Transactions::UpdateMetadata,
+                )
+                .await?;
+
+                emit_drop_updated_event(producer, key, DropUpdated {
+                    project_id: payload.project_id,
+                    drop_id: payload.drop_id,
+                    status: status as i32,
+                    tx_signature: sig.to_string(),
                 })
                 .await
                 .context("failed to emit drop_created event")?;
@@ -191,6 +216,7 @@ pub async fn create_project_treasury(
         let event = TreasuryEvents { event: Some(event) };
         let key = TreasuryEventKey {
             id: treasury.id.to_string(),
+            user_id: user_id.to_string(),
         };
 
         producer.send(Some(&event), Some(&key)).await?;
@@ -251,7 +277,7 @@ pub async fn create_customer_treasury(
     let event = TreasuryEvents {
         event: Some(treasury_events::Event::CustomerTreasuryCreated(
             CustomerTreasury {
-                customer_id: key.id,
+                customer_id: key.id.clone(),
                 project_id: customer.project_id,
             },
         )),
@@ -259,6 +285,7 @@ pub async fn create_customer_treasury(
 
     let key = TreasuryEventKey {
         id: treasury.id.to_string(),
+        user_id: key.id,
     };
 
     producer.send(Some(&event), Some(&key)).await?;
@@ -278,19 +305,22 @@ pub async fn create_raw_transaction(
     fireblocks: fireblocks::Client,
     rpc: &RpcClient,
     t: Transactions,
-) -> Result<TransactionStatus> {
+) -> Result<(TransactionStatus, Signature)> {
     let Transaction {
         serialized_message,
         signed_message_signatures,
+        ..
     } = transaction;
 
     let project = Uuid::parse_str(&project_id)?;
-    let payer_signature = signed_message_signatures
-        .get(0)
-        .context("failed to get payer signature")?;
-    let mint_signature = signed_message_signatures
-        .get(1)
-        .context("failed to get mint signature")?;
+
+    let mut signed_signatures = signed_message_signatures
+        .iter()
+        .map(|s| {
+            Signature::from_str(s).map_err(|e| anyhow!(format!("failed to parse signature: {e}")))
+        })
+        .collect::<Result<Vec<Signature>>>()?;
+
     let note = Some(format!(
         "{:?} by {:?} for project {:?}",
         t.to_string(),
@@ -356,39 +386,37 @@ pub async fn create_raw_transaction(
     // SIGNATURE LEN = 64 bytes
 
     let signature_decoded = <[u8; 64]>::from_hex(full_sig)?;
-
-    let signature = Signature::new(&signature_decoded);
+    signed_signatures.push(Signature::new(&signature_decoded));
 
     let decoded_message = bincode::deserialize(&serialized_message)?;
 
     let signed_transaction = SplTransaction {
-        signatures: vec![
-            Signature::from_str(payer_signature)?,
-            Signature::from_str(mint_signature)?,
-            signature,
-        ],
+        signatures: signed_signatures,
         message: decoded_message,
     };
 
-    let res = rpc.send_transaction(&signed_transaction)?;
+    let sig = rpc.send_transaction(&signed_transaction)?;
 
-    info!("{:?} signature {:?}", note, res);
+    info!("{:?} signature {:?}", note, sig);
 
-    Ok(tx_details.status)
+    Ok((tx_details.status, sig))
 
     // Ok(())
 }
 
 async fn emit_drop_created_event(
     producer: Producer<TreasuryEvents>,
-    id: String,
+    key: NftEventKey,
     payload: DropCreated,
 ) -> Result<()> {
     let event = TreasuryEvents {
         event: Some(treasury_events::Event::DropCreated(payload)),
     };
 
-    let key = TreasuryEventKey { id };
+    let key = TreasuryEventKey {
+        id: key.id,
+        user_id: key.user_id,
+    };
 
     producer
         .send(Some(&event), Some(&key))
@@ -398,14 +426,37 @@ async fn emit_drop_created_event(
 
 async fn emit_drop_minted_event(
     producer: Producer<TreasuryEvents>,
-    id: String,
+    key: NftEventKey,
     payload: DropMinted,
 ) -> Result<()> {
     let event = TreasuryEvents {
         event: Some(treasury_events::Event::DropMinted(payload)),
     };
 
-    let key = TreasuryEventKey { id };
+    let key = TreasuryEventKey {
+        id: key.id,
+        user_id: key.user_id,
+    };
+
+    producer
+        .send(Some(&event), Some(&key))
+        .await
+        .map_err(Into::into)
+}
+
+async fn emit_drop_updated_event(
+    producer: Producer<TreasuryEvents>,
+    key: NftEventKey,
+    payload: DropUpdated,
+) -> Result<()> {
+    let event = TreasuryEvents {
+        event: Some(treasury_events::Event::DropUpdated(payload)),
+    };
+
+    let key = TreasuryEventKey {
+        id: key.id,
+        user_id: key.user_id,
+    };
 
     producer
         .send(Some(&event), Some(&key))
@@ -417,6 +468,7 @@ async fn emit_drop_minted_event(
 pub enum Transactions {
     CreateMasterEdition,
     MintEdition,
+    UpdateMetadata,
 }
 
 impl fmt::Display for Transactions {
