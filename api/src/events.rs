@@ -14,7 +14,9 @@ use solana_sdk::{signature::Signature, transaction::Transaction as SplTransactio
 use crate::{
     db::Connection,
     entities::{
-        customer_treasuries, project_treasuries, treasuries,
+        customer_treasuries, project_treasuries,
+        sea_orm_active_enums::TxType,
+        transactions, treasuries,
         wallets::{self, AssetType},
     },
     proto::{
@@ -65,7 +67,7 @@ pub async fn process(
                     db,
                     fireblocks,
                     rpc,
-                    Transactions::CreateMasterEdition,
+                    TxType::CreateDrop,
                 )
                 .await?;
 
@@ -87,7 +89,7 @@ pub async fn process(
                     db,
                     fireblocks,
                     rpc,
-                    Transactions::MintEdition,
+                    TxType::MintEdition,
                 )
                 .await?;
 
@@ -110,7 +112,7 @@ pub async fn process(
                     db,
                     fireblocks,
                     rpc,
-                    Transactions::UpdateMetadata,
+                    TxType::UpdateMetadata,
                 )
                 .await?;
 
@@ -304,7 +306,7 @@ pub async fn create_raw_transaction(
     conn: Connection,
     fireblocks: fireblocks::Client,
     rpc: &RpcClient,
-    t: Transactions,
+    t: TxType,
 ) -> Result<(TransactionStatus, Signature)> {
     let Transaction {
         serialized_message,
@@ -321,11 +323,11 @@ pub async fn create_raw_transaction(
         })
         .collect::<Result<Vec<Signature>>>()?;
 
+    let tx_type: String = t.clone().into();
+
     let note = Some(format!(
         "{:?} by {:?} for project {:?}",
-        t.to_string(),
-        k.user_id,
-        project_id
+        tx_type, k.user_id, project_id
     ));
 
     let vault = treasuries::Entity::find()
@@ -399,9 +401,27 @@ pub async fn create_raw_transaction(
 
     info!("{:?} signature {:?}", note, sig);
 
-    Ok((tx_details.status, sig))
+    index_transaction(conn.get(), tx_details.id, sig, t).await?;
 
-    // Ok(())
+    Ok((tx_details.status, sig))
+}
+
+async fn index_transaction(
+    db: &DatabaseConnection,
+    id: String,
+    signature: Signature,
+    t: TxType,
+) -> Result<()> {
+    let tx_am = transactions::ActiveModel {
+        fireblocks_id: Set(Uuid::from_str(&id)?),
+        signature: Set(signature.to_string()),
+        tx_type: Set(t),
+        ..Default::default()
+    };
+
+    tx_am.insert(db).await?;
+
+    Ok(())
 }
 
 async fn emit_drop_created_event(
@@ -462,17 +482,4 @@ async fn emit_drop_updated_event(
         .send(Some(&event), Some(&key))
         .await
         .map_err(Into::into)
-}
-
-#[derive(Debug)]
-pub enum Transactions {
-    CreateMasterEdition,
-    MintEdition,
-    UpdateMetadata,
-}
-
-impl fmt::Display for Transactions {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{self:?}")
-    }
 }
