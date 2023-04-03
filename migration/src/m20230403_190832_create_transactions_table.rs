@@ -36,7 +36,12 @@ impl MigrationTrait for Migration {
                             .custom(TxType::Type)
                             .not_null(),
                     )
-                    .col(ColumnDef::new(Transactions::CreatedAt).string().not_null())
+                    .col(
+                        ColumnDef::new(Transactions::CreatedAt)
+                            .timestamp()
+                            .not_null()
+                            .extra("default now()".to_string()),
+                    )
                     .to_owned(),
             )
             .await
