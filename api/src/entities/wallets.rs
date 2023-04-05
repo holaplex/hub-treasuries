@@ -99,10 +99,7 @@ impl FromStr for AssetType {
 #[sea_orm(table_name = "wallets")]
 #[graphql(concrete(name = "Wallet", params()))]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
     pub treasury_id: Uuid,
-    /// The wallet's associated blockchain.
-    pub asset_id: AssetType,
     /// The wallet address.
     #[sea_orm(primary_key, auto_increment = false)]
     pub address: String,
@@ -111,6 +108,8 @@ pub struct Model {
     pub created_at: DateTime,
     pub removed_at: Option<DateTime>,
     pub created_by: Uuid,
+    /// The wallet's associated blockchain.
+    pub asset_id: AssetType,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
