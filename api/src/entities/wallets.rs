@@ -122,11 +122,25 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Treasuries,
+    #[sea_orm(
+        belongs_to = "super::customer_treasuries::Entity",
+        from = "Column::TreasuryId",
+        to = "super::customer_treasuries::Column::TreasuryId",
+        on_update = "Cascade",
+        on_delete = "Cascade"
+    )]
+    CustomerTreasuries,
 }
 
 impl Related<super::treasuries::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Treasuries.def()
+    }
+}
+
+impl Related<super::customer_treasuries::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::CustomerTreasuries.def()
     }
 }
 
