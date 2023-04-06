@@ -17,6 +17,17 @@ pub struct Customer {
 
 #[ComplexObject]
 impl Customer {
+    /// Returns all the wallet addresses associated with the customer. The blockchain of the address is not included and they are in no particular order. In the future, the blockchain may be indicated with a pattern of {blockchain}:{address}.
+    /// This field returns null when there is no treasury assigned to the customer yet.
+    pub async fn addresses(&self, ctx: &Context<'_>) -> Result<Option<Vec<String>>> {
+        let AppContext {
+            customer_wallet_addresses_loader,
+            ..
+        } = ctx.data::<AppContext>()?;
+
+        customer_wallet_addresses_loader.load_one(self.id).await
+    }
+
     /// The treasury assigned to the customer, which contains the customer's wallets.
     pub async fn treasury(&self, ctx: &Context<'_>) -> Result<Option<treasuries::Model>> {
         let AppContext {

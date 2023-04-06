@@ -18,8 +18,8 @@ use async_graphql::{
     EmptySubscription, Schema,
 };
 use dataloaders::{
-    CustomerTreasuryLoader, CustomerTreasuryWalletLoader, ProjectTreasuryLoader, TreasuryLoader,
-    TreasuryWalletsLoader, WalletLoader,
+    CustomerTreasuryLoader, CustomerTreasuryWalletLoader, CustomerWalletAddressesLoader,
+    ProjectTreasuryLoader, TreasuryLoader, TreasuryWalletsLoader, WalletLoader,
 };
 use db::Connection;
 use fireblocks::Client as FireblocksClient;
@@ -170,6 +170,7 @@ pub struct AppContext {
     pub treasury_wallets_loader: DataLoader<TreasuryWalletsLoader>,
     pub customer_treasury_wallet_loader: DataLoader<CustomerTreasuryWalletLoader>,
     pub treasury_loader: DataLoader<TreasuryLoader>,
+    pub customer_wallet_addresses_loader: DataLoader<CustomerWalletAddressesLoader>,
 }
 
 impl AppContext {
@@ -185,6 +186,8 @@ impl AppContext {
         let customer_treasury_wallet_loader =
             DataLoader::new(CustomerTreasuryWalletLoader::new(db.clone()), tokio::spawn);
         let treasury_loader = DataLoader::new(TreasuryLoader::new(db.clone()), tokio::spawn);
+        let customer_wallet_addresses_loader =
+            DataLoader::new(CustomerWalletAddressesLoader::new(db.clone()), tokio::spawn);
 
         Self {
             db,
@@ -195,6 +198,7 @@ impl AppContext {
             treasury_wallets_loader,
             customer_treasury_wallet_loader,
             treasury_loader,
+            customer_wallet_addresses_loader,
         }
     }
 }
