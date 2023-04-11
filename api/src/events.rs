@@ -368,13 +368,20 @@ pub async fn create_raw_transaction(
     let tx_details = loop {
         let tx_details = fireblocks.get_transaction(transaction.id.clone()).await?;
 
-        if tx_details.clone().signed_messages.is_empty() {
-            interval.tick().await;
+        match tx_details.clone().status {
+            TransactionStatus::FAILED
+            | TransactionStatus::COMPLETED
+            | TransactionStatus::BLOCKED
+            | TransactionStatus::CANCELLED
+            | TransactionStatus::REJECTED => {
+                break tx_details;
+            },
+            _ => {
+                interval.tick().await;
 
-            continue;
+                continue;
+            },
         }
-
-        break tx_details;
     };
 
     let full_sig = tx_details
