@@ -344,7 +344,7 @@ pub async fn create_raw_transaction(
         .vault_id;
 
     let tx = CreateTransaction {
-        asset_id: "SOL_TEST".to_string(),
+        asset_id: "SOL".to_string(),
         operation: TransactionOperation::RAW,
         source: TransferPeerPath {
             peer_type: "VAULT_ACCOUNT".to_string(),
