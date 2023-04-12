@@ -8,6 +8,8 @@ pub enum TxType {
     CreateDrop,
     #[sea_orm(string_value = "mint_edition")]
     MintEdition,
+    #[sea_orm(string_value = "transfer_mint")]
+    TransferMint,
     #[sea_orm(string_value = "update_metadata")]
     UpdateMetadata,
 }
@@ -17,6 +19,7 @@ impl From<TxType> for String {
         match value {
             TxType::CreateDrop => "CreateDrop".to_string(),
             TxType::MintEdition => "MintEdition".to_string(),
+            TxType::TransferMint => "TransferMint".to_string(),
             TxType::UpdateMetadata => "UpdateMetadata".to_string(),
         }
     }

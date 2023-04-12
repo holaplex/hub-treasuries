@@ -63,7 +63,7 @@ enum Transactions {
     CreatedAt,
 }
 
-enum TxType {
+pub enum TxType {
     Type,
     CreateDrop,
     MintEdition,
