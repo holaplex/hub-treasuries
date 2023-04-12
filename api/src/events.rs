@@ -25,8 +25,8 @@ use crate::{
         treasury_events::{
             CustomerTreasury, DropCreated, DropMinted, DropUpdated, ProjectWallet, {self},
         },
-        Customer, CustomerEventKey, NftEventKey, OrganizationEventKey, Project, Transaction,
-        TreasuryEventKey, TreasuryEvents,
+        Blockchain, Customer, CustomerEventKey, NftEventKey, OrganizationEventKey, Project,
+        Transaction, TreasuryEventKey, TreasuryEvents,
     },
     Services,
 };
@@ -209,10 +209,12 @@ pub async fn create_project_treasury(
 
         active_model.insert(conn.get()).await?;
 
+        let proto_blockchain_enum: Blockchain = asset_type.into();
+
         let event = treasury_events::Event::ProjectWalletCreated(ProjectWallet {
             project_id: project.id.to_string(),
             wallet_address: vault_asset.address,
-            blockchain: asset_type.into(),
+            blockchain: proto_blockchain_enum as i32,
         });
 
         let event = TreasuryEvents { event: Some(event) };
@@ -489,4 +491,17 @@ async fn emit_drop_updated_event(
         .send(Some(&event), Some(&key))
         .await
         .map_err(Into::into)
+}
+
+impl From<AssetType> for Blockchain {
+    fn from(value: AssetType) -> Self {
+        match value {
+            AssetType::Solana => Blockchain::Solana,
+            AssetType::SolanaTest => Blockchain::Solana,
+            AssetType::MaticTest => Blockchain::Polygon,
+            AssetType::Matic => Blockchain::Polygon,
+            AssetType::EthTest => Blockchain::Ethereum,
+            AssetType::Eth => Blockchain::Ethereum,
+        }
+    }
 }
