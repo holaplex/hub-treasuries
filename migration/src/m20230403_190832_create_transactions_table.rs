@@ -50,6 +50,10 @@ impl MigrationTrait for Migration {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .drop_table(Table::drop().table(Transactions::Table).to_owned())
+            .await?;
+
+        manager
+            .drop_type(Type::drop().if_exists().name(TxType::Type).to_owned())
             .await
     }
 }

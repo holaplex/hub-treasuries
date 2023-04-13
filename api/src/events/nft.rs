@@ -14,9 +14,11 @@ use crate::{
         prelude::{Treasuries, Wallets},
         project_treasuries,
         sea_orm_active_enums::TxType,
-        transactions, treasuries, wallets,
+        transactions, treasuries,
+        wallets::{self, AssetType},
     },
     proto::{
+        self,
         treasury_events::{DropCreated, DropMinted, DropUpdated, Event, MintTransfered},
         NftEventKey, Transaction, TransferMintTransaction, TreasuryEventKey, TreasuryEvents,
     },
@@ -145,7 +147,7 @@ pub async fn create_raw_transaction(
     let Transaction {
         serialized_message,
         signed_message_signatures,
-        ..
+        blockchain,
     } = transaction;
 
     let mut signed_signatures = signed_message_signatures
@@ -162,8 +164,20 @@ pub async fn create_raw_transaction(
         tx_type, k.user_id, project_id
     ));
 
+    let blockchain: proto::Blockchain =
+        proto::Blockchain::from_i32(blockchain).context("can not parse blockchain enum")?;
+    let asset_ids: Vec<AssetType> = blockchain.try_into()?;
+
+    let wallet = wallets::Entity::find()
+        .join(JoinType::InnerJoin, wallets::Relation::Treasuries.def())
+        .filter(treasuries::Column::VaultId.eq(vault.clone()))
+        .filter(wallets::Column::AssetId.is_in(asset_ids))
+        .one(conn.get())
+        .await?
+        .context("wallet not found")?;
+
     let tx = CreateTransaction {
-        asset_id: "SOL_TEST".to_string(),
+        asset_id: wallet.asset_id.into(),
         operation: TransactionOperation::RAW,
         source: TransferPeerPath {
             peer_type: "VAULT_ACCOUNT".to_string(),

@@ -127,3 +127,16 @@ impl From<AssetType> for Blockchain {
         }
     }
 }
+
+impl TryFrom<Blockchain> for Vec<AssetType> {
+    type Error = Error;
+
+    fn try_from(value: Blockchain) -> Result<Self> {
+        match value {
+            Blockchain::Solana => Ok(vec![AssetType::Solana, AssetType::SolanaTest]),
+            Blockchain::Polygon => Ok(vec![AssetType::Matic, AssetType::MaticTest]),
+            Blockchain::Ethereum => Ok(vec![AssetType::Eth, AssetType::EthTest]),
+            Blockchain::Unspecified => Err(anyhow!("Unspecified blockchain")),
+        }
+    }
+}
