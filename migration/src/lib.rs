@@ -8,6 +8,7 @@ mod m20230301_124216_add_project_id_to_customer_treasuries;
 mod m20230301_161016_change_asset_id_to_integer_on_wallets;
 mod m20230331_133153_remove_treasury_id_as_pk_from_wallets;
 mod m20230403_190832_create_transactions_table;
+mod m20230411_220605_add_transfer_asset_to_tx_type_enum;
 
 pub struct Migrator;
 
@@ -23,6 +24,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20230301_161016_change_asset_id_to_integer_on_wallets::Migration),
             Box::new(m20230331_133153_remove_treasury_id_as_pk_from_wallets::Migration),
             Box::new(m20230403_190832_create_transactions_table::Migration),
+            Box::new(m20230411_220605_add_transfer_asset_to_tx_type_enum::Migration),
         ]
     }
 }
