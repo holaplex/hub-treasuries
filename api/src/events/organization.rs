@@ -118,12 +118,9 @@ pub async fn create_project_treasury(
 impl From<AssetType> for Blockchain {
     fn from(value: AssetType) -> Self {
         match value {
-            AssetType::Solana => Blockchain::Solana,
-            AssetType::SolanaTest => Blockchain::Solana,
-            AssetType::MaticTest => Blockchain::Polygon,
-            AssetType::Matic => Blockchain::Polygon,
-            AssetType::EthTest => Blockchain::Ethereum,
-            AssetType::Eth => Blockchain::Ethereum,
+            AssetType::SolanaTest | AssetType::Solana => Blockchain::Solana,
+            AssetType::MaticTest | AssetType::Matic => Blockchain::Polygon,
+            AssetType::EthTest | AssetType::Eth => Blockchain::Ethereum,
         }
     }
 }
