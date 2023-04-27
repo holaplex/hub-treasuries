@@ -239,13 +239,15 @@ pub async fn create_raw_transaction(
         message: decoded_message,
     };
 
-    let sig = rpc.send_transaction(&signed_transaction)?;
+    let rpc_response = rpc.send_transaction(&signed_transaction);
+    info!("RPC response {:?}", rpc_response);
 
-    info!("{:?} signature {:?}", note, sig);
+    let signature = rpc_response?;
+    info!("{:?} signature {:?}", note, signature);
 
-    index_transaction(conn.get(), tx_details.id, sig, t).await?;
+    index_transaction(conn.get(), tx_details.id, signature, t).await?;
 
-    Ok((tx_details.status, sig))
+    Ok((tx_details.status, signature))
 }
 
 /// This is a helper function used by `create_raw_transaction` to index the transaction details in the database.
