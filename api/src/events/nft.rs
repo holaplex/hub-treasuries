@@ -31,10 +31,46 @@ use crate::{
 pub async fn emit_drop_created_event(
     producer: Producer<TreasuryEvents>,
     key: NftEventKey,
-    payload: DropCreated,
+    project_id: String,
+    status: TransactionStatus,
+    tx_signature: String,
 ) -> Result<()> {
     let event = TreasuryEvents {
-        event: Some(Event::DropCreated(payload)),
+        event: Some(Event::DropCreated(DropCreated {
+            project_id,
+            status: status as i32,
+            tx_signature: tx_signature,
+        })),
+    };
+
+    let key = TreasuryEventKey {
+        id: key.id,
+        user_id: key.user_id,
+    };
+
+    producer
+        .send(Some(&event), Some(&key))
+        .await
+        .map_err(Into::into)
+}
+
+/// This function emits a `DropCreated` event to a Producer of `TreasuryEvents`.
+/// # Errors
+///
+/// This function will return an error if it fails to emit the event.
+pub async fn emit_drop_retried_event(
+    producer: Producer<TreasuryEvents>,
+    key: NftEventKey,
+    project_id: String,
+    status: TransactionStatus,
+    signature: String,
+) -> Result<()> {
+    let event = TreasuryEvents {
+        event: Some(Event::DropRetried(DropCreated {
+            project_id,
+            status: status as i32,
+            tx_signature: signature,
+        })),
     };
 
     let key = TreasuryEventKey {
@@ -55,10 +91,50 @@ pub async fn emit_drop_created_event(
 pub async fn emit_drop_minted_event(
     producer: Producer<TreasuryEvents>,
     key: NftEventKey,
-    payload: DropMinted,
+    project_id: String,
+    drop_id: String,
+    status: TransactionStatus,
+    signature: String,
 ) -> Result<()> {
     let event = TreasuryEvents {
-        event: Some(Event::DropMinted(payload)),
+        event: Some(Event::DropMinted(DropMinted {
+            project_id,
+            drop_id,
+            status: status as i32,
+            tx_signature: signature,
+        })),
+    };
+
+    let key = TreasuryEventKey {
+        id: key.id,
+        user_id: key.user_id,
+    };
+
+    producer
+        .send(Some(&event), Some(&key))
+        .await
+        .map_err(Into::into)
+}
+
+/// This function emits a `DropMinted` event.
+/// # Errors
+///
+/// This function will return an error if it fails to emit the event.
+pub async fn emit_mint_retried_event(
+    producer: Producer<TreasuryEvents>,
+    key: NftEventKey,
+    project_id: String,
+    drop_id: String,
+    status: TransactionStatus,
+    signature: String,
+) -> Result<()> {
+    let event = TreasuryEvents {
+        event: Some(Event::MintRetried(DropMinted {
+            project_id,
+            drop_id,
+            status: status as i32,
+            tx_signature: signature,
+        })),
     };
 
     let key = TreasuryEventKey {
