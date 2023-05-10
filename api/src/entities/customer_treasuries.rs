@@ -10,7 +10,7 @@ pub struct Model {
     pub customer_id: Uuid,
     #[sea_orm(unique)]
     pub treasury_id: Uuid,
-    pub created_at: DateTime,
+    pub created_at: DateTimeWithTimeZone,
     pub project_id: Uuid,
 }
 

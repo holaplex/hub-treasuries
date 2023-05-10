@@ -105,8 +105,8 @@ pub struct Model {
     pub address: String,
     pub legacy_address: String,
     pub tag: String,
-    pub created_at: DateTime,
-    pub removed_at: Option<DateTime>,
+    pub created_at: DateTimeWithTimeZone,
+    pub removed_at: Option<DateTimeWithTimeZone>,
     pub created_by: Uuid,
     /// The wallet's associated blockchain.
     pub asset_id: AssetType,

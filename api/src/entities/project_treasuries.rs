@@ -12,7 +12,7 @@ pub struct Model {
     pub project_id: Uuid,
     #[sea_orm(unique)]
     pub treasury_id: Uuid,
-    pub created_at: DateTime,
+    pub created_at: DateTimeWithTimeZone,
 }
 
 #[Object(name = "ProjectTreasury")]
@@ -25,7 +25,7 @@ impl Model {
         &self.treasury_id
     }
 
-    async fn created_at(&self) -> &DateTime {
+    async fn created_at(&self) -> &DateTimeWithTimeZone {
         &self.created_at
     }
 

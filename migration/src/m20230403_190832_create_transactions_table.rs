@@ -59,7 +59,7 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(Iden)]
-enum Transactions {
+pub enum Transactions {
     Table,
     FireblocksId,
     Signature,
