@@ -113,6 +113,7 @@ pub async fn emit_mint_transfered_event(
             mint_address: payload.address,
             tx_signature,
             project_id: payload.project_id,
+            transfer_id: payload.transfer_id,
         })),
     };
 
