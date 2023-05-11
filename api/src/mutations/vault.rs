@@ -72,6 +72,23 @@ impl Mutation {
 
         let treasury = treasury.ok_or_else(|| Error::new("treasury not found"))?;
 
+        let wallet_exists = wallets::Entity::find()
+            .filter(
+                wallets::Column::TreasuryId
+                    .eq(treasury.id.clone())
+                    .and(wallets::Column::AssetId.eq(asset_type.clone())),
+            )
+            .one(conn)
+            .await?
+            .is_some();
+
+        if wallet_exists {
+            return Err(Error::new(format!(
+                "wallet already exists for customer {:?} and asset type {:?} ",
+                customer, asset_type
+            )));
+        }
+
         let deduction_id = submit_pending_deduction(
             credits,
             db,
