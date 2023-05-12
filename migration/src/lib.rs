@@ -10,7 +10,7 @@ mod m20230331_133153_remove_treasury_id_as_pk_from_wallets;
 mod m20230403_190832_create_transactions_table;
 mod m20230411_220605_add_transfer_asset_to_tx_type_enum;
 mod m20230510_162853_change_datatype_to_tz_utc;
-mod m20230511_015035_create_wallet_deductions_table;
+mod m20230511_015035_add_deduction_id_to_wallets;
 mod m20230511_022149_add_indexes_for_wallets_table;
 
 pub struct Migrator;
@@ -29,7 +29,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20230403_190832_create_transactions_table::Migration),
             Box::new(m20230411_220605_add_transfer_asset_to_tx_type_enum::Migration),
             Box::new(m20230510_162853_change_datatype_to_tz_utc::Migration),
-            Box::new(m20230511_015035_create_wallet_deductions_table::Migration),
+            Box::new(m20230511_015035_add_deduction_id_to_wallets::Migration),
             Box::new(m20230511_022149_add_indexes_for_wallets_table::Migration),
         ]
     }

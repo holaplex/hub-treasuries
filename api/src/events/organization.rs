@@ -86,10 +86,9 @@ pub async fn create_project_treasury(
         let active_model = wallets::ActiveModel {
             treasury_id: Set(treasury.id),
             asset_id: Set(asset_type),
-            address: Set(vault_asset.address.clone()),
-            legacy_address: Set(vault_asset.legacy_address),
-            tag: Set(vault_asset.tag),
+            address: Set(Some(vault_asset.address.clone())),
             created_by: Set(user_id),
+            deduction_id: Set(None),
             ..Default::default()
         };
 

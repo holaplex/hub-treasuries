@@ -35,8 +35,13 @@ impl DataLoader<String> for WalletLoader {
 
         Ok(wallets
             .into_iter()
-            .map(|i| (i.address.clone(), i))
-            .collect())
+            .map(|i| {
+                let address = i.address.clone().ok_or_else(|| {
+                    Self::Error::new(format!("Address is missing for wallet with ID {}", i.id))
+                })?;
+                Ok((address, i))
+            })
+            .collect::<Result<_>>()?)
     }
 }
 

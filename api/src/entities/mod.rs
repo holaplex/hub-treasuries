@@ -7,5 +7,4 @@ pub mod project_treasuries;
 pub mod sea_orm_active_enums;
 pub mod transactions;
 pub mod treasuries;
-pub mod wallet_deductions;
 pub mod wallets;

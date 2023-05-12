@@ -31,7 +31,9 @@ impl DataLoader<Uuid> for WalletAddressesLoader {
 
         let customer_wallets = customer_treasuries::Entity::find()
             .filter(
-                customer_treasuries::Column::CustomerId.is_in(keys.iter().map(ToOwned::to_owned)),
+                customer_treasuries::Column::CustomerId
+                    .is_in(keys.iter().map(ToOwned::to_owned))
+                    .and(wallets::Column::Address.is_not_null()),
             )
             .join(
                 JoinType::InnerJoin,
@@ -43,12 +45,20 @@ impl DataLoader<Uuid> for WalletAddressesLoader {
 
         Ok(customer_wallets
             .into_iter()
-            .map(|(customer_treasuries, wallets)| {
-                (
-                    customer_treasuries.customer_id,
-                    wallets.into_iter().map(|wallet| wallet.address).collect(),
-                )
+            .map(|(ct, wallets)| {
+                let addresses = wallets
+                    .into_iter()
+                    .map(|wallet| {
+                        wallet.address.ok_or_else(|| {
+                            Self::Error::new(format!(
+                                "Address is missing for wallet with ID {}",
+                                wallet.id
+                            ))
+                        })
+                    })
+                    .collect::<Result<_>>()?;
+                Ok((ct.customer_id, addresses))
             })
-            .collect())
+            .collect::<Result<_>>()?)
     }
 }

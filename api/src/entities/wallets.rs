@@ -101,15 +101,15 @@ impl FromStr for AssetType {
 pub struct Model {
     pub treasury_id: Uuid,
     /// The wallet address.
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub address: String,
-    pub legacy_address: String,
-    pub tag: String,
-    pub created_at: DateTimeWithTimeZone,
-    pub removed_at: Option<DateTimeWithTimeZone>,
+    pub address: Option<String>,
+    pub created_at: DateTime,
+    pub removed_at: Option<DateTime>,
     pub created_by: Uuid,
     /// The wallet's associated blockchain.
     pub asset_id: AssetType,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: Uuid,
+    pub deduction_id: Option<Uuid>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

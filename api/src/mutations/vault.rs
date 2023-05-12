@@ -11,8 +11,8 @@ use crate::{
     db::Connection,
     entities::{
         customer_treasuries,
-        prelude::WalletDeductions,
-        treasuries, wallet_deductions,
+        prelude::Wallets,
+        treasuries,
         wallets::{self, AssetType},
     },
     proto::{treasury_events, TreasuryEventKey, TreasuryEvents},
@@ -72,32 +72,14 @@ impl Mutation {
 
         let treasury = treasury.ok_or_else(|| Error::new("treasury not found"))?;
 
-        let wallet_exists = wallets::Entity::find()
-            .filter(
-                wallets::Column::TreasuryId
-                    .eq(treasury.id.clone())
-                    .and(wallets::Column::AssetId.eq(asset_type.clone())),
-            )
-            .one(conn)
-            .await?
-            .is_some();
-
-        if wallet_exists {
-            return Err(Error::new(format!(
-                "wallet already exists for customer {:?} and asset type {:?} ",
-                customer, asset_type
-            )));
-        }
-
-        let deduction_id = submit_pending_deduction(
-            credits,
-            db,
+        let deduction_id = submit_pending_deduction(credits, db, DeductionParams {
             balance,
             user_id,
+            customer,
             org_id,
-            customer_treasury.id,
+            treasury: treasury.id,
             asset_type,
-        )
+        })
         .await?;
 
         let vault_asset = fireblocks
@@ -110,23 +92,11 @@ impl Mutation {
             )
             .await?;
 
-        let active_model = wallets::ActiveModel {
-            treasury_id: Set(treasury.id),
-            asset_id: Set(asset_type),
-            address: Set(vault_asset.address.clone()),
-            legacy_address: Set(vault_asset.legacy_address),
-            tag: Set(vault_asset.tag),
-            created_by: Set(user_id),
-            ..Default::default()
-        };
-
-        let wallet = active_model.insert(conn).await?;
-
         credits
             .confirm_deduction(TransactionId(deduction_id))
             .await?;
 
-        update_wallet_deduction(db, wallet.address.clone(), deduction_id).await?;
+        let wallet = update_wallet_address(db, vault_asset.address, deduction_id).await?;
 
         let event = TreasuryEvents {
             event: Some(treasury_events::Event::CustomerWalletCreated(
@@ -148,31 +118,47 @@ impl Mutation {
     }
 }
 
-/// Returns the ID of an existing wallet deduction entry if it exists for the given customer_treasury and asset_type.
-/// Otherwise, it generates a new pending deduction ID using the CreditsClient
-/// and creates a new entry in the wallet_deductions table, returning its ID.
+/// Checks if the wallet already exists for the given treasury and asset type.
+/// Returns the ID of an existing wallet  entry if it exists for the given treasury and asset type.
+/// Otherwise, it generates a new pending deduction ID using the `CreditsClient`
+/// and creates a new entry in the wallets table, returning its ID.
 /// #Errors
 /// May return an error if there is an issue with querying or inserting data, or if the asset type is not supported.
 async fn submit_pending_deduction(
     credits: &CreditsClient<Actions>,
     db: &Connection,
-    balance: u64,
-    user_id: Uuid,
-    org_id: Uuid,
-    customer_treasury: Uuid,
-    asset_type: AssetType,
+    params: DeductionParams,
 ) -> Result<Uuid> {
-    let wallet_deduction = WalletDeductions::find()
+    let DeductionParams {
+        balance,
+        user_id,
+        customer,
+        org_id,
+        treasury,
+        asset_type,
+    } = params;
+
+    let wallet = Wallets::find()
         .filter(
-            wallet_deductions::Column::CustomerTreasury
-                .eq(customer_treasury)
-                .and(wallet_deductions::Column::AssetId.eq(asset_type)),
+            wallets::Column::TreasuryId
+                .eq(treasury)
+                .and(wallets::Column::AssetId.eq(asset_type)),
         )
         .one(db.get())
         .await?;
 
-    if let Some(wallet_deduction) = wallet_deduction {
-        return Ok(wallet_deduction.id);
+    if let Some(wallet) = wallet {
+        match (wallet.address, wallet.deduction_id) {
+            (Some(_), _) => {
+                return Err(Error::new(format!(
+                    "wallet already exists for customer {customer} and asset type {asset_type} "
+                )));
+            },
+            (_, Some(deduction_id)) => {
+                return Ok(deduction_id);
+            },
+            _ => {},
+        }
     }
 
     let id = match asset_type {
@@ -196,36 +182,40 @@ async fn submit_pending_deduction(
         .ok_or_else(|| Error::new("failed to generate credits deduction id"))?
         .0;
 
-    let wallet_model = wallet_deductions::ActiveModel {
-        id: Set(deduction_id),
-        customer_treasury: Set(customer_treasury),
-        asset_id: Set(asset_type),
+    let wallet_model = wallets::ActiveModel {
+        treasury_id: Set(treasury),
         address: Set(None),
-        created_at: Set(Utc::now().into()),
+        created_at: Set(Utc::now().naive_utc()),
+        removed_at: Set(None),
+        created_by: Set(user_id),
+        asset_id: Set(asset_type),
+        deduction_id: Set(Some(deduction_id)),
+        ..Default::default()
     };
     wallet_model.insert(db.get()).await?;
 
     Ok(deduction_id)
 }
 
-/// Updates the address of the wallet deduction record with the specified UUID
+/// Updates the address of the wallet record with the specified UUID
 /// # Errors
-/// Fails if the wallet deduction is not found or fails to update the record.
-async fn update_wallet_deduction(
+/// Fails if the wallet is not found or fails to update the record.
+async fn update_wallet_address(
     db: &Connection,
     address: String,
     deduction_id: Uuid,
-) -> Result<()> {
-    let wallet_deduction_model = WalletDeductions::find_by_id(deduction_id)
+) -> Result<wallets::Model> {
+    let wallet_model = Wallets::find()
+        .filter(wallets::Column::DeductionId.eq(deduction_id))
         .one(db.get())
         .await?
-        .ok_or_else(|| Error::new("wallet deduction not found"))?;
+        .ok_or_else(|| Error::new("wallet not found"))?;
 
-    let mut wallet_deduction: wallet_deductions::ActiveModel = wallet_deduction_model.into();
-    wallet_deduction.address = Set(Some(address));
-    wallet_deduction.update(db.get()).await?;
+    let mut wallet_am: wallets::ActiveModel = wallet_model.into();
+    wallet_am.address = Set(Some(address));
+    let wallet = wallet_am.update(db.get()).await?;
 
-    Ok(())
+    Ok(wallet)
 }
 
 /// Input for creating a customer wallet.
@@ -258,4 +248,13 @@ impl From<wallets::AssetType> for treasury_events::Blockchain {
             },
         }
     }
+}
+
+struct DeductionParams {
+    balance: u64,
+    user_id: Uuid,
+    customer: Uuid,
+    org_id: Uuid,
+    treasury: Uuid,
+    asset_type: AssetType,
 }
