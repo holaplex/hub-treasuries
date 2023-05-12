@@ -1,4 +1,6 @@
-FROM lukemathwalker/cargo-chef:0.1.50-rust-buster AS chef
+FROM rust:1.69.0-bullseye as chef
+RUN cargo install cargo-chef --locked
+
 WORKDIR /app
 
 RUN apt-get update -y && \
