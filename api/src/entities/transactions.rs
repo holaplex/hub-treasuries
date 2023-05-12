@@ -11,7 +11,7 @@ pub struct Model {
     pub fireblocks_id: Uuid,
     pub signature: String,
     pub tx_type: TxType,
-    pub created_at: DateTime,
+    pub created_at: DateTimeWithTimeZone,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

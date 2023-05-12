@@ -20,8 +20,8 @@ pub struct Model {
     /// [Vault Objects](https://docs.fireblocks.com/api/#vault-objects)
     #[sea_orm(unique)]
     pub vault_id: String,
-    /// The creation datetime of the vault.
-    pub created_at: DateTime,
+    /// The creation DateTimeWithTimeZone of the vault.
+    pub created_at: DateTimeWithTimeZone,
 }
 
 #[ComplexObject]
