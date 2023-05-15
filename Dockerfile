@@ -16,7 +16,7 @@ RUN apt-get update -y && \
   rm -rf /var/lib/apt/lists/*
 
 FROM chef AS planner
-COPY Cargo.* rust-toolchain.toml ./
+COPY Cargo.* ./
 COPY api api
 COPY migration migration
 COPY fireblocks fireblocks
@@ -27,7 +27,7 @@ COPY --from=planner /app/recipe.json recipe.json
 # Build dependencies - this is the caching Docker layer!
 RUN cargo chef cook --release --recipe-path recipe.json
 # Build application
-COPY Cargo.* rust-toolchain.toml ./
+COPY Cargo.* ./
 COPY api api
 COPY migration migration
 COPY fireblocks fireblocks
