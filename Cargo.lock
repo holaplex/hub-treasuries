@@ -2302,6 +2302,7 @@ dependencies = [
  "hex",
  "holaplex-hub-core",
  "holaplex-hub-core-build",
+ "once_cell",
  "poem",
  "prost",
  "sea-orm 0.10.7",

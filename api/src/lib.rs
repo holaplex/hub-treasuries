@@ -12,6 +12,8 @@ pub mod mutations;
 pub mod objects;
 pub mod queries;
 
+use std::collections::HashMap;
+
 use async_graphql::{
     dataloader::DataLoader,
     extensions::{ApolloTracing, Logger},
@@ -34,11 +36,14 @@ use hub_core::{
     uuid::Uuid,
 };
 use mutations::Mutation;
+use once_cell::sync::OnceCell;
 use poem::{async_trait, FromRequest, Request, RequestBody};
 use proto::{TreasuryEventKey, TreasuryEvents};
 use queries::Query;
 
 pub type AppSchema = Schema<Query, Mutation, EmptySubscription>;
+
+pub static BLOCKCHAIN_ASSET_IDS: OnceCell<HashMap<proto::Blockchain, &str>> = OnceCell::new();
 
 #[allow(clippy::pedantic)]
 pub mod proto {
@@ -195,6 +200,9 @@ pub struct Args {
     #[arg(short, long, env, value_delimiter = ',')]
     pub fireblocks_supported_asset_ids: Vec<String>,
 
+    #[arg(short, long, env)]
+    pub treasury_vault_id: String,
+
     #[command(flatten)]
     pub db: db::DbArgs,
 
@@ -289,4 +297,34 @@ pub fn build_schema() -> AppSchema {
         .extension(Logger)
         .enable_federation()
         .finish()
+}
+
+pub fn initialize_blockchain_asset_ids() {
+    if cfg!(debug_assertions) {
+        let hashmap: HashMap<proto::Blockchain, &str> = [
+            (proto::Blockchain::Solana, "SOL_TEST"),
+            (proto::Blockchain::Ethereum, "ETH_TEST"),
+            (proto::Blockchain::Polygon, "MATIC_TEST"),
+        ]
+        .iter()
+        .copied()
+        .collect();
+
+        BLOCKCHAIN_ASSET_IDS
+            .set(hashmap)
+            .expect("Failed to set blockchain test asset ids");
+    } else {
+        let hashmap: HashMap<proto::Blockchain, &str> = [
+            (proto::Blockchain::Solana, "SOL"),
+            (proto::Blockchain::Ethereum, "ETH"),
+            (proto::Blockchain::Polygon, "MATIC"),
+        ]
+        .iter()
+        .copied()
+        .collect();
+
+        BLOCKCHAIN_ASSET_IDS
+            .set(hashmap)
+            .expect("Failed to set blockchain asset ids");
+    }
 }
