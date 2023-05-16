@@ -203,6 +203,9 @@ pub struct Args {
     #[arg(short, long, env)]
     pub treasury_vault_id: String,
 
+    #[arg(long, env, default_value = "false")]
+    pub fireblocks_test_env: bool,
+
     #[command(flatten)]
     pub db: db::DbArgs,
 
@@ -299,32 +302,28 @@ pub fn build_schema() -> AppSchema {
         .finish()
 }
 
-pub fn initialize_blockchain_asset_ids() {
-    if cfg!(debug_assertions) {
-        let hashmap: HashMap<proto::Blockchain, &str> = [
+pub fn initialize_blockchain_asset_ids(fireblocks_test_env: bool) {
+    let hashmap: HashMap<proto::Blockchain, &str> = if fireblocks_test_env {
+        [
             (proto::Blockchain::Solana, "SOL_TEST"),
             (proto::Blockchain::Ethereum, "ETH_TEST"),
             (proto::Blockchain::Polygon, "MATIC_TEST"),
         ]
         .iter()
         .copied()
-        .collect();
-
-        BLOCKCHAIN_ASSET_IDS
-            .set(hashmap)
-            .expect("Failed to set blockchain test asset ids");
+        .collect()
     } else {
-        let hashmap: HashMap<proto::Blockchain, &str> = [
+        [
             (proto::Blockchain::Solana, "SOL"),
             (proto::Blockchain::Ethereum, "ETH"),
             (proto::Blockchain::Polygon, "MATIC"),
         ]
         .iter()
         .copied()
-        .collect();
+        .collect()
+    };
 
-        BLOCKCHAIN_ASSET_IDS
-            .set(hashmap)
-            .expect("Failed to set blockchain asset ids");
-    }
+    BLOCKCHAIN_ASSET_IDS
+        .set(hashmap)
+        .expect("failed to set blockchain asset ids");
 }

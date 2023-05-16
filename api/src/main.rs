@@ -5,7 +5,7 @@ use holaplex_hub_treasuries::{
     db::Connection,
     events,
     handlers::{graphql_handler, health, playground},
-    initialize_blockchain_asset_ids, proto, Actions, AppState, Args, Services,
+    initialize_blockchain_asset_ids, proto, AppState, Args, Services, Actions,
 };
 use hub_core::{
     anyhow::Context as AnyhowContext,
@@ -26,6 +26,7 @@ pub fn main() {
             solana_endpoint,
             fireblocks_supported_asset_ids,
             treasury_vault_id,
+            fireblocks_test_env,
             db,
             fireblocks,
         } = args;
@@ -50,7 +51,7 @@ pub fn main() {
 
             let cons = common.consumer_cfg.build::<Services>().await?;
 
-            initialize_blockchain_asset_ids();
+            initialize_blockchain_asset_ids(fireblocks_test_env);
 
             tokio::spawn(async move {
                 {
