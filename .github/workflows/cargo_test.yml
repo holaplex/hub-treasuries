@@ -15,7 +15,7 @@ concurrency:
 jobs:
   test:
     name: Cargo Test
-    runs-on: self-hosted
+    runs-on: amd64
 
     services:
       postgres:
@@ -41,7 +41,7 @@ jobs:
             libssl-dev \
             libudev-dev \
             pkg-config \
-            protobuf-compiler 
+            protobuf-compiler
 
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1

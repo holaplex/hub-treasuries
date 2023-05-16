@@ -5,7 +5,7 @@ use holaplex_hub_treasuries::{
     db::Connection,
     events,
     handlers::{graphql_handler, health, playground},
-    proto, AppState, Args, Services,
+    proto, Actions, AppState, Args, Services,
 };
 use hub_core::{
     anyhow::Context as AnyhowContext,
@@ -37,12 +37,13 @@ pub fn main() {
             let fireblocks = fireblocks::Client::new(fireblocks)?;
             let rpc_client = Arc::new(RpcClient::new(solana_endpoint));
             let producer = common.producer_cfg.build::<proto::TreasuryEvents>().await?;
-
+            let credits = common.credits_cfg.build::<Actions>().await?;
             let state = AppState::new(
                 schema,
                 connection.clone(),
                 fireblocks.clone(),
                 producer.clone(),
+                credits,
             );
 
             let cons = common.consumer_cfg.build::<Services>().await?;

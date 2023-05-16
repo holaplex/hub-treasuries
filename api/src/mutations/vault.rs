@@ -1,12 +1,22 @@
 use async_graphql::{Context, Error, InputObject, Object, Result, SimpleObject};
 use fireblocks::{objects::vault::CreateVaultWallet, Client as FireblocksClient};
-use hub_core::producer::Producer;
+use hub_core::{
+    chrono::Utc,
+    credits::{CreditsClient, TransactionId},
+    producer::Producer,
+};
 use sea_orm::{prelude::*, JoinType, QuerySelect, Set};
 
 use crate::{
-    entities::{customer_treasuries, treasuries, wallets},
+    db::Connection,
+    entities::{
+        customer_treasuries,
+        prelude::Wallets,
+        treasuries,
+        wallets::{self, AssetType},
+    },
     proto::{treasury_events, TreasuryEventKey, TreasuryEvents},
-    AppContext, UserID,
+    Actions, AppContext,
 };
 
 #[derive(Default)]
@@ -23,18 +33,31 @@ impl Mutation {
         ctx: &Context<'_>,
         input: CreateCustomerWalletInput,
     ) -> Result<CreateCustomerWalletPayload> {
-        let AppContext { db, user_id, .. } = ctx.data::<AppContext>()?;
+        let AppContext {
+            db,
+            user_id,
+            organization_id,
+            balance,
+            ..
+        } = ctx.data::<AppContext>()?;
         let fireblocks = ctx.data::<FireblocksClient>()?;
+        let credits = ctx.data::<CreditsClient<Actions>>()?;
         let conn = db.get();
         let producer = ctx.data::<Producer<TreasuryEvents>>()?;
-
-        let UserID(id) = user_id;
         let CreateCustomerWalletInput {
             customer,
             asset_type,
         } = input;
 
-        let user_id = id.ok_or_else(|| Error::new("X-USER-ID header not found"))?;
+        let user_id = user_id
+            .0
+            .ok_or_else(|| Error::new("X-USER-ID header not found"))?;
+        let org_id = organization_id
+            .0
+            .ok_or_else(|| Error::new("X-ORGANIZATION-ID header not found"))?;
+        let balance = balance
+            .0
+            .ok_or_else(|| Error::new("X-CREDIT-BALANCE header not found"))?;
 
         let (customer_treasury, treasury) = customer_treasuries::Entity::find()
             .join(
@@ -49,6 +72,16 @@ impl Mutation {
 
         let treasury = treasury.ok_or_else(|| Error::new("treasury not found"))?;
 
+        let deduction_id = submit_pending_deduction(credits, db, DeductionParams {
+            balance,
+            user_id,
+            customer,
+            org_id,
+            treasury: treasury.id,
+            asset_type,
+        })
+        .await?;
+
         let vault_asset = fireblocks
             .create_vault_wallet(
                 treasury.vault_id.clone(),
@@ -59,17 +92,11 @@ impl Mutation {
             )
             .await?;
 
-        let active_model = wallets::ActiveModel {
-            treasury_id: Set(treasury.id),
-            asset_id: Set(asset_type),
-            address: Set(vault_asset.address.clone()),
-            legacy_address: Set(vault_asset.legacy_address),
-            tag: Set(vault_asset.tag),
-            created_by: Set(user_id),
-            ..Default::default()
-        };
+        credits
+            .confirm_deduction(TransactionId(deduction_id))
+            .await?;
 
-        let wallet = active_model.insert(conn).await?;
+        let wallet = update_wallet_address(db, vault_asset.address, deduction_id).await?;
 
         let event = TreasuryEvents {
             event: Some(treasury_events::Event::CustomerWalletCreated(
@@ -89,6 +116,106 @@ impl Mutation {
 
         Ok(CreateCustomerWalletPayload { wallet })
     }
+}
+
+/// Checks if the wallet already exists for the given treasury and asset type.
+/// Returns the ID of an existing wallet  entry if it exists for the given treasury and asset type.
+/// Otherwise, it generates a new pending deduction ID using the `CreditsClient`
+/// and creates a new entry in the wallets table, returning its ID.
+/// #Errors
+/// May return an error if there is an issue with querying or inserting data, or if the asset type is not supported.
+async fn submit_pending_deduction(
+    credits: &CreditsClient<Actions>,
+    db: &Connection,
+    params: DeductionParams,
+) -> Result<Uuid> {
+    let DeductionParams {
+        balance,
+        user_id,
+        customer,
+        org_id,
+        treasury,
+        asset_type,
+    } = params;
+
+    let wallet = Wallets::find()
+        .filter(
+            wallets::Column::TreasuryId
+                .eq(treasury)
+                .and(wallets::Column::AssetId.eq(asset_type)),
+        )
+        .one(db.get())
+        .await?;
+
+    if let Some(wallet) = wallet {
+        match (wallet.address, wallet.deduction_id) {
+            (Some(_), _) => {
+                return Err(Error::new(format!(
+                    "wallet already exists for customer {customer} and asset type {asset_type} "
+                )));
+            },
+            (_, Some(deduction_id)) => {
+                return Ok(deduction_id);
+            },
+            _ => {},
+        }
+    }
+
+    let id = match asset_type {
+        AssetType::Solana | AssetType::SolanaTest => {
+            credits
+                .submit_pending_deduction(
+                    org_id,
+                    user_id,
+                    Actions::CreateWallet,
+                    hub_core::credits::Blockchain::Solana,
+                    balance,
+                )
+                .await?
+        },
+        _ => {
+            return Err(Error::new("blockchain not supported yet"));
+        },
+    };
+
+    let deduction_id = id
+        .ok_or_else(|| Error::new("failed to generate credits deduction id"))?
+        .0;
+
+    let wallet_model = wallets::ActiveModel {
+        treasury_id: Set(treasury),
+        address: Set(None),
+        created_at: Set(Utc::now().naive_utc()),
+        removed_at: Set(None),
+        created_by: Set(user_id),
+        asset_id: Set(asset_type),
+        deduction_id: Set(Some(deduction_id)),
+        ..Default::default()
+    };
+    wallet_model.insert(db.get()).await?;
+
+    Ok(deduction_id)
+}
+
+/// Updates the address of the wallet record with the specified UUID
+/// # Errors
+/// Fails if the wallet is not found or fails to update the record.
+async fn update_wallet_address(
+    db: &Connection,
+    address: String,
+    deduction_id: Uuid,
+) -> Result<wallets::Model> {
+    let wallet_model = Wallets::find()
+        .filter(wallets::Column::DeductionId.eq(deduction_id))
+        .one(db.get())
+        .await?
+        .ok_or_else(|| Error::new("wallet not found"))?;
+
+    let mut wallet_am: wallets::ActiveModel = wallet_model.into();
+    wallet_am.address = Set(Some(address));
+    let wallet = wallet_am.update(db.get()).await?;
+
+    Ok(wallet)
 }
 
 /// Input for creating a customer wallet.
@@ -121,4 +248,13 @@ impl From<wallets::AssetType> for treasury_events::Blockchain {
             },
         }
     }
+}
+
+struct DeductionParams {
+    balance: u64,
+    user_id: Uuid,
+    customer: Uuid,
+    org_id: Uuid,
+    treasury: Uuid,
+    asset_type: AssetType,
 }

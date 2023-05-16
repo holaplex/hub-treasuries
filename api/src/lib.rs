@@ -27,6 +27,7 @@ use hub_core::{
     anyhow::{Error, Result},
     clap,
     consumer::RecvError,
+    credits::CreditsClient,
     prelude::*,
     producer::Producer,
     tokio,
@@ -117,6 +118,71 @@ impl<'a> FromRequest<'a> for UserID {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct OrganizationId(Option<Uuid>);
+
+impl TryFrom<&str> for OrganizationId {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        let id = Uuid::from_str(value)?;
+
+        Ok(Self(Some(id)))
+    }
+}
+
+#[async_trait]
+impl<'a> FromRequest<'a> for OrganizationId {
+    async fn from_request(req: &'a Request, _body: &mut RequestBody) -> poem::Result<Self> {
+        let id = req
+            .headers()
+            .get("X-ORGANIZATION-ID")
+            .and_then(|value| value.to_str().ok())
+            .map_or(Ok(Self(None)), Self::try_from)?;
+
+        Ok(id)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Balance(Option<u64>);
+
+impl TryFrom<&str> for Balance {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        let balance = value.parse()?;
+
+        Ok(Self(Some(balance)))
+    }
+}
+
+#[async_trait]
+impl<'a> FromRequest<'a> for Balance {
+    async fn from_request(req: &'a Request, _body: &mut RequestBody) -> poem::Result<Self> {
+        let id = req
+            .headers()
+            .get("X-CREDIT-BALANCE")
+            .and_then(|value| value.to_str().ok())
+            .map_or(Ok(Self(None)), Self::try_from)?;
+
+        Ok(id)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum::EnumIter, strum::AsRefStr)]
+pub enum Actions {
+    CreateWallet,
+}
+
+impl From<Actions> for hub_core::credits::Action {
+    fn from(value: Actions) -> Self {
+        match value {
+            Actions::CreateWallet => hub_core::credits::Action::CreateWallet,
+        }
+    }
+}
+
 #[derive(Debug, clap::Args)]
 #[command(version, author, about)]
 pub struct Args {
@@ -142,6 +208,7 @@ pub struct AppState {
     pub connection: Connection,
     pub fireblocks: FireblocksClient,
     pub producer: Producer<TreasuryEvents>,
+    pub credits: CreditsClient<Actions>,
 }
 
 impl AppState {
@@ -151,12 +218,14 @@ impl AppState {
         connection: Connection,
         fireblocks: FireblocksClient,
         producer: Producer<TreasuryEvents>,
+        credits: CreditsClient<Actions>,
     ) -> Self {
         Self {
             schema,
             connection,
             fireblocks,
             producer,
+            credits,
         }
     }
 }
@@ -164,6 +233,8 @@ impl AppState {
 pub struct AppContext {
     pub db: Connection,
     pub user_id: UserID,
+    pub organization_id: OrganizationId,
+    pub balance: Balance,
     pub customer_treasury_loader: DataLoader<CustomerTreasuryLoader>,
     pub project_treasury_loader: DataLoader<ProjectTreasuryLoader>,
     pub wallet_loader: DataLoader<WalletLoader>,
@@ -175,7 +246,12 @@ pub struct AppContext {
 
 impl AppContext {
     #[must_use]
-    pub fn new(db: Connection, user_id: UserID) -> Self {
+    pub fn new(
+        db: Connection,
+        user_id: UserID,
+        organization_id: OrganizationId,
+        balance: Balance,
+    ) -> Self {
         let customer_treasury_loader =
             DataLoader::new(CustomerTreasuryLoader::new(db.clone()), tokio::spawn);
         let project_treasury_loader =
@@ -192,6 +268,8 @@ impl AppContext {
         Self {
             db,
             user_id,
+            organization_id,
+            balance,
             customer_treasury_loader,
             project_treasury_loader,
             wallet_loader,
