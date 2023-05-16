@@ -5,7 +5,7 @@ use holaplex_hub_treasuries::{
     db::Connection,
     events,
     handlers::{graphql_handler, health, playground},
-    proto, Actions, AppState, Args, Services,
+    initialize_blockchain_asset_ids, proto, Actions, AppState, Args, Services,
 };
 use hub_core::{
     anyhow::Context as AnyhowContext,
@@ -14,6 +14,7 @@ use hub_core::{
 };
 use poem::{get, listener::TcpListener, middleware::AddData, post, EndpointExt, Route, Server};
 use solana_client::rpc_client::RpcClient;
+
 pub fn main() {
     let opts = hub_core::StartConfig {
         service_name: "hub-treasuries",
@@ -24,6 +25,7 @@ pub fn main() {
             port,
             solana_endpoint,
             fireblocks_supported_asset_ids,
+            treasury_vault_id,
             db,
             fireblocks,
         } = args;
@@ -48,6 +50,8 @@ pub fn main() {
 
             let cons = common.consumer_cfg.build::<Services>().await?;
 
+            initialize_blockchain_asset_ids();
+
             tokio::spawn(async move {
                 {
                     let mut stream = cons.stream();
@@ -56,6 +60,7 @@ pub fn main() {
                         let connection = connection.clone();
                         let rpc_client = rpc_client.clone();
                         let fireblocks_supported_asset_ids = fireblocks_supported_asset_ids.clone();
+                        let treasury_vault_id = treasury_vault_id.clone();
                         let producer = producer.clone();
 
                         match stream.next().await {
@@ -69,6 +74,7 @@ pub fn main() {
                                             connection.clone(),
                                             fireblocks.clone(),
                                             fireblocks_supported_asset_ids,
+                                            treasury_vault_id,
                                             &rpc_client,
                                             producer,
                                         )

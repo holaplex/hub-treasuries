@@ -2,6 +2,7 @@ pub mod customer;
 pub mod nft;
 pub mod organization;
 use customer::create_customer_treasury;
+use fireblocks::objects::transaction::TransactionStatus;
 use hub_core::{prelude::*, producer::Producer};
 use nft::{
     create_raw_transaction, emit_drop_created_event, emit_drop_minted_event,
@@ -12,6 +13,7 @@ use solana_client::rpc_client::RpcClient;
 
 use self::nft::{
     emit_mint_transfered_event, find_vault_id_by_project_id, find_vault_id_by_wallet_address,
+    RawTxParams,
 };
 use crate::{
     db::Connection,
@@ -45,6 +47,7 @@ pub async fn process(
     db: Connection,
     fireblocks: fireblocks::Client,
     supported_ids: Vec<String>,
+    treasury_vault_id: String,
     rpc: &RpcClient,
     producer: Producer<TreasuryEvents>,
 ) -> Result<()> {
@@ -68,17 +71,20 @@ pub async fn process(
                 let vault =
                     find_vault_id_by_project_id(db.get(), payload.project_id.clone()).await?;
 
-                let (status, signature) = create_raw_transaction(
-                    key.clone(),
-                    payload.transaction.context("transaction not found")?,
-                    payload.project_id.clone(),
-                    vault.to_string(),
-                    db,
-                    fireblocks,
-                    rpc,
-                    TxType::CreateDrop,
-                )
-                .await?;
+                let (status, signature) =
+                    match create_raw_transaction(db, fireblocks, rpc, RawTxParams {
+                        key: key.clone(),
+                        transaction: payload.transaction.context("transaction not found")?,
+                        project_id: payload.project_id.clone(),
+                        vault: vault.to_string(),
+                        tx_type: TxType::CreateDrop,
+                        treasury_vault_id,
+                    })
+                    .await
+                    {
+                        Ok((status, signature)) => (status, signature.to_string()),
+                        Err(_) => (TransactionStatus::FAILED, String::new()),
+                    };
 
                 emit_drop_created_event(producer, key, payload.project_id, status, signature)
                     .await
@@ -90,17 +96,20 @@ pub async fn process(
                 let vault =
                     find_vault_id_by_project_id(db.get(), payload.project_id.clone()).await?;
 
-                let (status, signature) = create_raw_transaction(
-                    key.clone(),
-                    payload.transaction.context("transaction not found")?,
-                    payload.project_id.clone(),
-                    vault.to_string(),
-                    db,
-                    fireblocks,
-                    rpc,
-                    TxType::CreateDrop,
-                )
-                .await?;
+                let (status, signature) =
+                    match create_raw_transaction(db, fireblocks, rpc, RawTxParams {
+                        key: key.clone(),
+                        transaction: payload.transaction.context("transaction not found")?,
+                        project_id: payload.project_id.clone(),
+                        vault: vault.to_string(),
+                        tx_type: TxType::CreateDrop,
+                        treasury_vault_id,
+                    })
+                    .await
+                    {
+                        Ok((status, signature)) => (status, signature.to_string()),
+                        Err(_) => (TransactionStatus::FAILED, String::new()),
+                    };
 
                 emit_drop_retried_event(producer, key, payload.project_id, status, signature)
                     .await
@@ -112,17 +121,20 @@ pub async fn process(
                 let vault =
                     find_vault_id_by_project_id(db.get(), payload.project_id.clone()).await?;
 
-                let (status, signature) = create_raw_transaction(
-                    key.clone(),
-                    payload.transaction.context("transaction not found")?,
-                    payload.project_id.clone(),
-                    vault,
-                    db,
-                    fireblocks,
-                    rpc,
-                    TxType::MintEdition,
-                )
-                .await?;
+                let (status, signature) =
+                    match create_raw_transaction(db, fireblocks, rpc, RawTxParams {
+                        key: key.clone(),
+                        transaction: payload.transaction.context("transaction not found")?,
+                        project_id: payload.project_id.clone(),
+                        vault,
+                        tx_type: TxType::MintEdition,
+                        treasury_vault_id,
+                    })
+                    .await
+                    {
+                        Ok((status, signature)) => (status, signature.to_string()),
+                        Err(_) => (TransactionStatus::FAILED, String::new()),
+                    };
 
                 emit_drop_minted_event(
                     producer,
@@ -132,8 +144,7 @@ pub async fn process(
                     status,
                     signature,
                 )
-                .await
-                .context("failed to emit drop_minted event")?;
+                .await?;
 
                 Ok(())
             },
@@ -141,17 +152,20 @@ pub async fn process(
                 let vault =
                     find_vault_id_by_project_id(db.get(), payload.project_id.clone()).await?;
 
-                let (status, signature) = create_raw_transaction(
-                    key.clone(),
-                    payload.transaction.context("transaction not found")?,
-                    payload.project_id.clone(),
-                    vault,
-                    db,
-                    fireblocks,
-                    rpc,
-                    TxType::MintEdition,
-                )
-                .await?;
+                let (status, signature) =
+                    match create_raw_transaction(db, fireblocks, rpc, RawTxParams {
+                        key: key.clone(),
+                        transaction: payload.transaction.context("transaction not found")?,
+                        project_id: payload.project_id.clone(),
+                        vault: vault.to_string(),
+                        tx_type: TxType::MintEdition,
+                        treasury_vault_id,
+                    })
+                    .await
+                    {
+                        Ok((status, signature)) => (status, signature.to_string()),
+                        Err(_) => (TransactionStatus::FAILED, String::new()),
+                    };
 
                 emit_mint_retried_event(
                     producer,
@@ -170,17 +184,20 @@ pub async fn process(
                 let vault =
                     find_vault_id_by_project_id(db.get(), payload.project_id.clone()).await?;
 
-                let (status, signature) = create_raw_transaction(
-                    key.clone(),
-                    payload.transaction.context("transaction not found")?,
-                    payload.project_id.clone(),
-                    vault,
-                    db,
-                    fireblocks,
-                    rpc,
-                    TxType::UpdateMetadata,
-                )
-                .await?;
+                let (status, signature) =
+                    match create_raw_transaction(db, fireblocks, rpc, RawTxParams {
+                        key: key.clone(),
+                        transaction: payload.transaction.context("transaction not found")?,
+                        project_id: payload.project_id.clone(),
+                        vault: vault.to_string(),
+                        tx_type: TxType::MintEdition,
+                        treasury_vault_id,
+                    })
+                    .await
+                    {
+                        Ok((status, signature)) => (status, signature.to_string()),
+                        Err(_) => (TransactionStatus::FAILED, String::new()),
+                    };
 
                 emit_drop_updated_event(producer, key, DropUpdated {
                     project_id: payload.project_id,
@@ -197,19 +214,17 @@ pub async fn process(
                 let vault =
                     find_vault_id_by_wallet_address(db.get(), payload.sender.clone()).await?;
 
-                let (_, signature) = create_raw_transaction(
-                    key.clone(),
-                    payload
+                let (_, signature) = create_raw_transaction(db, fireblocks, rpc, RawTxParams {
+                    key: key.clone(),
+                    transaction: payload
                         .transaction
                         .clone()
                         .context("transaction not found")?,
-                    payload.project_id.clone(),
+                    project_id: payload.project_id.clone(),
                     vault,
-                    db,
-                    fireblocks,
-                    rpc,
-                    TxType::TransferMint,
-                )
+                    tx_type: TxType::TransferMint,
+                    treasury_vault_id,
+                })
                 .await?;
 
                 emit_mint_transfered_event(producer, key, payload, signature.to_string())

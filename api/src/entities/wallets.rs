@@ -24,7 +24,7 @@ pub enum AssetType {
     #[graphql(name = "SOL_TEST")]
     #[sea_orm(num_value = 1)]
     SolanaTest,
-    /// Ploygon Mumbai Testnet
+    /// Polygon Mumbai Testnet
     /// Note: Holaplex uses `MATIC_TEST` for provisioning wallets on its staging environment but still submits transactions to mainnet.
     #[graphql(name = "MATIC_TEST")]
     #[sea_orm(num_value = 2)]
