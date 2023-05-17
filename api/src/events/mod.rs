@@ -16,9 +16,10 @@ use self::nft::{
 use crate::{
     db::Connection,
     entities::sea_orm_active_enums::TxType,
+    events::nft::{emit_drop_retried_event, emit_mint_retried_event},
     proto::{
-        customer_events, nft_events, organization_events,
-        treasury_events::{DropCreated, DropMinted, DropUpdated},
+        customer_events::Event as CustomerEvent, nft_events::Event as NftEvent,
+        organization_events::Event as OrganizationEvent, treasury_events::DropUpdated,
         TreasuryEvents,
     },
     Services,
@@ -50,20 +51,20 @@ pub async fn process(
     // match topics
     match msg {
         Services::Customers(key, e) => match e.event {
-            Some(customer_events::Event::Created(customer)) => {
+            Some(CustomerEvent::Created(customer)) => {
                 create_customer_treasury(db, fireblocks, producer, key, customer).await
             },
             Some(_) | None => Ok(()),
         },
         Services::Organizations(key, e) => match e.event {
-            Some(organization_events::Event::ProjectCreated(p)) => {
+            Some(OrganizationEvent::ProjectCreated(p)) => {
                 create_project_treasury(key, p, db, fireblocks, producer, supported_ids).await
             },
             Some(_) | None => Ok(()),
         },
         Services::Nfts(key, e) => match e.event {
             // match topic messages
-            Some(nft_events::Event::CreateDrop(payload)) => {
+            Some(NftEvent::CreateDrop(payload)) => {
                 let vault =
                     find_vault_id_by_project_id(db.get(), payload.project_id.clone()).await?;
 
@@ -79,17 +80,35 @@ pub async fn process(
                 )
                 .await?;
 
-                emit_drop_created_event(producer, key, DropCreated {
-                    project_id: payload.project_id,
-                    status: status as i32,
-                    tx_signature: signature,
-                })
-                .await
-                .context("failed to emit drop_created event")?;
+                emit_drop_created_event(producer, key, payload.project_id, status, signature)
+                    .await
+                    .context("failed to emit drop_created event")?;
 
                 Ok(())
             },
-            Some(nft_events::Event::MintDrop(payload)) => {
+            Some(NftEvent::RetryDrop(payload)) => {
+                let vault =
+                    find_vault_id_by_project_id(db.get(), payload.project_id.clone()).await?;
+
+                let (status, signature) = create_raw_transaction(
+                    key.clone(),
+                    payload.transaction.context("transaction not found")?,
+                    payload.project_id.clone(),
+                    vault.to_string(),
+                    db,
+                    fireblocks,
+                    rpc,
+                    TxType::CreateDrop,
+                )
+                .await?;
+
+                emit_drop_retried_event(producer, key, payload.project_id, status, signature)
+                    .await
+                    .context("failed to emit drop retried event")?;
+
+                Ok(())
+            },
+            Some(NftEvent::MintDrop(payload)) => {
                 let vault =
                     find_vault_id_by_project_id(db.get(), payload.project_id.clone()).await?;
 
@@ -105,18 +124,49 @@ pub async fn process(
                 )
                 .await?;
 
-                emit_drop_minted_event(producer, key, DropMinted {
-                    project_id: payload.project_id,
-                    drop_id: payload.drop_id,
-                    status: status as i32,
-                    tx_signature: signature,
-                })
+                emit_drop_minted_event(
+                    producer,
+                    key,
+                    payload.project_id,
+                    payload.drop_id,
+                    status,
+                    signature,
+                )
                 .await
-                .context("failed to emit drop_created event")?;
+                .context("failed to emit drop_minted event")?;
 
                 Ok(())
             },
-            Some(nft_events::Event::UpdateMetadata(payload)) => {
+            Some(NftEvent::RetryMint(payload)) => {
+                let vault =
+                    find_vault_id_by_project_id(db.get(), payload.project_id.clone()).await?;
+
+                let (status, signature) = create_raw_transaction(
+                    key.clone(),
+                    payload.transaction.context("transaction not found")?,
+                    payload.project_id.clone(),
+                    vault,
+                    db,
+                    fireblocks,
+                    rpc,
+                    TxType::MintEdition,
+                )
+                .await?;
+
+                emit_mint_retried_event(
+                    producer,
+                    key,
+                    payload.project_id,
+                    payload.drop_id,
+                    status,
+                    signature,
+                )
+                .await
+                .context("failed to emit mint retried event")?;
+
+                Ok(())
+            },
+            Some(NftEvent::UpdateMetadata(payload)) => {
                 let vault =
                     find_vault_id_by_project_id(db.get(), payload.project_id.clone()).await?;
 
@@ -143,7 +193,7 @@ pub async fn process(
 
                 Ok(())
             },
-            Some(nft_events::Event::TransferMint(payload)) => {
+            Some(NftEvent::TransferMint(payload)) => {
                 let vault =
                     find_vault_id_by_wallet_address(db.get(), payload.sender.clone()).await?;
 
@@ -168,6 +218,7 @@ pub async fn process(
 
                 Ok(())
             },
+
             None => Ok(()),
         },
     }
