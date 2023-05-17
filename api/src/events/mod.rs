@@ -67,7 +67,7 @@ pub async fn process(
                 let vault =
                     find_vault_id_by_project_id(db.get(), payload.project_id.clone()).await?;
 
-                let (status, sig) = create_raw_transaction(
+                let (status, signature) = create_raw_transaction(
                     key.clone(),
                     payload.transaction.context("transaction not found")?,
                     payload.project_id.clone(),
@@ -82,7 +82,7 @@ pub async fn process(
                 emit_drop_created_event(producer, key, DropCreated {
                     project_id: payload.project_id,
                     status: status as i32,
-                    tx_signature: sig.to_string(),
+                    tx_signature: signature,
                 })
                 .await
                 .context("failed to emit drop_created event")?;
@@ -93,7 +93,7 @@ pub async fn process(
                 let vault =
                     find_vault_id_by_project_id(db.get(), payload.project_id.clone()).await?;
 
-                let (status, sig) = create_raw_transaction(
+                let (status, signature) = create_raw_transaction(
                     key.clone(),
                     payload.transaction.context("transaction not found")?,
                     payload.project_id.clone(),
@@ -109,7 +109,7 @@ pub async fn process(
                     project_id: payload.project_id,
                     drop_id: payload.drop_id,
                     status: status as i32,
-                    tx_signature: sig.to_string(),
+                    tx_signature: signature,
                 })
                 .await
                 .context("failed to emit drop_created event")?;
@@ -120,7 +120,7 @@ pub async fn process(
                 let vault =
                     find_vault_id_by_project_id(db.get(), payload.project_id.clone()).await?;
 
-                let (status, sig) = create_raw_transaction(
+                let (status, signature) = create_raw_transaction(
                     key.clone(),
                     payload.transaction.context("transaction not found")?,
                     payload.project_id.clone(),
@@ -136,7 +136,7 @@ pub async fn process(
                     project_id: payload.project_id,
                     drop_id: payload.drop_id,
                     status: status as i32,
-                    tx_signature: sig.to_string(),
+                    tx_signature: signature,
                 })
                 .await
                 .context("failed to emit drop_created event")?;
