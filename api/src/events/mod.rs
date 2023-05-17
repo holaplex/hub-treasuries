@@ -80,7 +80,6 @@ pub async fn process(
                 )
                 .await?;
 
-             
                 emit_drop_created_event(producer, key, payload.project_id, status, signature)
                     .await
                     .context("failed to emit drop_created event")?;
@@ -125,7 +124,6 @@ pub async fn process(
                 )
                 .await?;
 
-                
                 emit_drop_minted_event(
                     producer,
                     key,

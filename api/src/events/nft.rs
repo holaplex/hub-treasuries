@@ -39,7 +39,7 @@ pub async fn emit_drop_created_event(
         event: Some(Event::DropCreated(DropCreated {
             project_id,
             status: status as i32,
-            tx_signature: tx_signature,
+            tx_signature,
         })),
     };
 
@@ -355,18 +355,16 @@ pub(crate) async fn find_vault_id_by_project_id(
 ) -> Result<String> {
     let project = Uuid::from_str(&project)?;
 
-    let vault = treasuries::Entity::find()
-        .join(
-            JoinType::InnerJoin,
-            treasuries::Relation::ProjectTreasury.def(),
-        )
+    let (_, t) = project_treasuries::Entity::find()
+        .find_also_related(treasuries::Entity)
         .filter(project_treasuries::Column::ProjectId.eq(project))
         .one(db)
         .await?
-        .context("treasury not found in database")?
-        .vault_id;
+        .context("treasury not found in database")?;
 
-    Ok(vault)
+    let t = t.ok_or_else(|| anyhow!("treasury not found"))?;
+
+    Ok(t.vault_id)
 }
 
 /// This function finds the vault ID associated with a wallet address in the database.
