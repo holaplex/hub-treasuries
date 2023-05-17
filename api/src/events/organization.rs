@@ -35,7 +35,6 @@ pub async fn create_project_treasury(
     let asset_types: Vec<AssetType> = supported_ids
         .iter()
         .map(|a| AssetType::from_str(a))
-        .into_iter()
         .collect::<Result<Vec<AssetType>>>()?;
 
     let create_vault = CreateVault {

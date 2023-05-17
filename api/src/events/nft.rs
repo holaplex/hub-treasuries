@@ -144,7 +144,7 @@ pub async fn create_raw_transaction(
     fireblocks: fireblocks::Client,
     rpc: &RpcClient,
     t: TxType,
-) -> Result<(TransactionStatus, Signature)> {
+) -> Result<(TransactionStatus, String)> {
     let Transaction {
         serialized_message,
         signed_message_signatures,
@@ -205,18 +205,18 @@ pub async fn create_raw_transaction(
         let tx_details = fireblocks.get_transaction(transaction.id.clone()).await?;
 
         match tx_details.clone().status {
-            TransactionStatus::FAILED
-            | TransactionStatus::COMPLETED
-            | TransactionStatus::BLOCKED
-            | TransactionStatus::CANCELLED
-            | TransactionStatus::REJECTED => {
-                break tx_details;
-            },
-            _ => {
+            TransactionStatus::SUBMITTED
+            | TransactionStatus::QUEUED
+            | TransactionStatus::BROADCASTING
+            | TransactionStatus::CONFIRMING => {
                 interval.tick().await;
 
                 continue;
             },
+            TransactionStatus::COMPLETED => {
+                break tx_details;
+            },
+            _ => return Ok((tx_details.status, String::new())),
         }
     };
 
@@ -248,7 +248,7 @@ pub async fn create_raw_transaction(
 
     index_transaction(conn.get(), tx_details.id, signature, t).await?;
 
-    Ok((tx_details.status, signature))
+    Ok((tx_details.status, signature.to_string()))
 }
 
 /// This is a helper function used by `create_raw_transaction` to index the transaction details in the database.
