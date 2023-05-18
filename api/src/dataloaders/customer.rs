@@ -6,7 +6,7 @@ use sea_orm::{prelude::*, JoinType, QuerySelect};
 
 use crate::{
     db::Connection,
-    entities::{customer_treasuries, wallets},
+    entities::{customer_treasuries, treasuries, wallets},
 };
 
 #[derive(Debug, Clone)]
@@ -37,8 +37,9 @@ impl DataLoader<Uuid> for WalletAddressesLoader {
             )
             .join(
                 JoinType::InnerJoin,
-                customer_treasuries::Relation::Wallets.def(),
+                customer_treasuries::Relation::Treasuries.def(),
             )
+            .join(JoinType::InnerJoin, treasuries::Relation::Wallets.def())
             .select_with(wallets::Entity)
             .all(conn)
             .await?;
