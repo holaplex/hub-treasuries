@@ -102,8 +102,8 @@ pub struct Model {
     pub treasury_id: Uuid,
     /// The wallet address.
     pub address: Option<String>,
-    pub created_at: DateTime,
-    pub removed_at: Option<DateTime>,
+    pub created_at: DateTimeWithTimeZone,
+    pub removed_at: Option<DateTimeWithTimeZone>,
     pub created_by: Uuid,
     /// The wallet's associated blockchain.
     pub asset_id: AssetType,

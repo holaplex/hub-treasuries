@@ -185,7 +185,7 @@ async fn submit_pending_deduction(
     let wallet_model = wallets::ActiveModel {
         treasury_id: Set(treasury),
         address: Set(None),
-        created_at: Set(Utc::now().naive_utc()),
+        created_at: Set(Utc::now().into()),
         removed_at: Set(None),
         created_by: Set(user_id),
         asset_id: Set(asset_type),
