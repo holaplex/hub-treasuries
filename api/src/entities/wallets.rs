@@ -101,15 +101,15 @@ impl FromStr for AssetType {
 pub struct Model {
     pub treasury_id: Uuid,
     /// The wallet address.
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub address: String,
-    pub legacy_address: String,
-    pub tag: String,
-    pub created_at: DateTime,
-    pub removed_at: Option<DateTime>,
+    pub address: Option<String>,
+    pub created_at: DateTimeWithTimeZone,
+    pub removed_at: Option<DateTimeWithTimeZone>,
     pub created_by: Uuid,
     /// The wallet's associated blockchain.
     pub asset_id: AssetType,
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: Uuid,
+    pub deduction_id: Option<Uuid>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -122,25 +122,11 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Treasuries,
-    #[sea_orm(
-        belongs_to = "super::customer_treasuries::Entity",
-        from = "Column::TreasuryId",
-        to = "super::customer_treasuries::Column::TreasuryId",
-        on_update = "Cascade",
-        on_delete = "Cascade"
-    )]
-    CustomerTreasuries,
 }
 
 impl Related<super::treasuries::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Treasuries.def()
-    }
-}
-
-impl Related<super::customer_treasuries::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::CustomerTreasuries.def()
     }
 }
 

@@ -12,7 +12,7 @@ pub struct Model {
     pub project_id: Uuid,
     #[sea_orm(unique)]
     pub treasury_id: Uuid,
-    pub created_at: DateTime,
+    pub created_at: DateTimeWithTimeZone,
 }
 
 #[Object(name = "ProjectTreasury")]
@@ -25,7 +25,7 @@ impl Model {
         &self.treasury_id
     }
 
-    async fn created_at(&self) -> &DateTime {
+    async fn created_at(&self) -> &DateTimeWithTimeZone {
         &self.created_at
     }
 
@@ -44,13 +44,19 @@ impl Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_one = "super::treasuries::Entity")]
-    Treasury,
+    #[sea_orm(
+        belongs_to = "super::treasuries::Entity",
+        from = "Column::TreasuryId",
+        to = "super::treasuries::Column::Id",
+        on_update = "Cascade",
+        on_delete = "Cascade"
+    )]
+    Treasuries,
 }
 
 impl Related<super::treasuries::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Treasury.def()
+        Relation::Treasuries.def()
     }
 }
 

@@ -31,10 +31,46 @@ use crate::{
 pub async fn emit_drop_created_event(
     producer: Producer<TreasuryEvents>,
     key: NftEventKey,
-    payload: DropCreated,
+    project_id: String,
+    status: TransactionStatus,
+    tx_signature: String,
 ) -> Result<()> {
     let event = TreasuryEvents {
-        event: Some(Event::DropCreated(payload)),
+        event: Some(Event::DropCreated(DropCreated {
+            project_id,
+            status: status as i32,
+            tx_signature,
+        })),
+    };
+
+    let key = TreasuryEventKey {
+        id: key.id,
+        user_id: key.user_id,
+    };
+
+    producer
+        .send(Some(&event), Some(&key))
+        .await
+        .map_err(Into::into)
+}
+
+/// This function emits a `DropCreated` event to a Producer of `TreasuryEvents`.
+/// # Errors
+///
+/// This function will return an error if it fails to emit the event.
+pub async fn emit_drop_retried_event(
+    producer: Producer<TreasuryEvents>,
+    key: NftEventKey,
+    project_id: String,
+    status: TransactionStatus,
+    signature: String,
+) -> Result<()> {
+    let event = TreasuryEvents {
+        event: Some(Event::DropRetried(DropCreated {
+            project_id,
+            status: status as i32,
+            tx_signature: signature,
+        })),
     };
 
     let key = TreasuryEventKey {
@@ -55,10 +91,50 @@ pub async fn emit_drop_created_event(
 pub async fn emit_drop_minted_event(
     producer: Producer<TreasuryEvents>,
     key: NftEventKey,
-    payload: DropMinted,
+    project_id: String,
+    drop_id: String,
+    status: TransactionStatus,
+    signature: String,
 ) -> Result<()> {
     let event = TreasuryEvents {
-        event: Some(Event::DropMinted(payload)),
+        event: Some(Event::DropMinted(DropMinted {
+            project_id,
+            drop_id,
+            status: status as i32,
+            tx_signature: signature,
+        })),
+    };
+
+    let key = TreasuryEventKey {
+        id: key.id,
+        user_id: key.user_id,
+    };
+
+    producer
+        .send(Some(&event), Some(&key))
+        .await
+        .map_err(Into::into)
+}
+
+/// This function emits a `DropMinted` event.
+/// # Errors
+///
+/// This function will return an error if it fails to emit the event.
+pub async fn emit_mint_retried_event(
+    producer: Producer<TreasuryEvents>,
+    key: NftEventKey,
+    project_id: String,
+    drop_id: String,
+    status: TransactionStatus,
+    signature: String,
+) -> Result<()> {
+    let event = TreasuryEvents {
+        event: Some(Event::MintRetried(DropMinted {
+            project_id,
+            drop_id,
+            status: status as i32,
+            tx_signature: signature,
+        })),
     };
 
     let key = TreasuryEventKey {
@@ -144,7 +220,7 @@ pub async fn create_raw_transaction(
     fireblocks: fireblocks::Client,
     rpc: &RpcClient,
     t: TxType,
-) -> Result<(TransactionStatus, Signature)> {
+) -> Result<(TransactionStatus, String)> {
     let Transaction {
         serialized_message,
         signed_message_signatures,
@@ -205,18 +281,18 @@ pub async fn create_raw_transaction(
         let tx_details = fireblocks.get_transaction(transaction.id.clone()).await?;
 
         match tx_details.clone().status {
-            TransactionStatus::FAILED
-            | TransactionStatus::COMPLETED
-            | TransactionStatus::BLOCKED
-            | TransactionStatus::CANCELLED
-            | TransactionStatus::REJECTED => {
-                break tx_details;
-            },
-            _ => {
+            TransactionStatus::SUBMITTED
+            | TransactionStatus::QUEUED
+            | TransactionStatus::BROADCASTING
+            | TransactionStatus::CONFIRMING => {
                 interval.tick().await;
 
                 continue;
             },
+            TransactionStatus::COMPLETED => {
+                break tx_details;
+            },
+            _ => return Ok((tx_details.status, String::new())),
         }
     };
 
@@ -248,7 +324,7 @@ pub async fn create_raw_transaction(
 
     index_transaction(conn.get(), tx_details.id, signature, t).await?;
 
-    Ok((tx_details.status, signature))
+    Ok((tx_details.status, signature.to_string()))
 }
 
 /// This is a helper function used by `create_raw_transaction` to index the transaction details in the database.
@@ -279,18 +355,16 @@ pub(crate) async fn find_vault_id_by_project_id(
 ) -> Result<String> {
     let project = Uuid::from_str(&project)?;
 
-    let vault = treasuries::Entity::find()
-        .join(
-            JoinType::InnerJoin,
-            treasuries::Relation::ProjectTreasury.def(),
-        )
+    let (_, t) = project_treasuries::Entity::find()
+        .find_also_related(treasuries::Entity)
         .filter(project_treasuries::Column::ProjectId.eq(project))
         .one(db)
         .await?
-        .context("treasury not found in database")?
-        .vault_id;
+        .context("treasury not found in database")?;
 
-    Ok(vault)
+    let t = t.ok_or_else(|| anyhow!("treasury not found"))?;
+
+    Ok(t.vault_id)
 }
 
 /// This function finds the vault ID associated with a wallet address in the database.

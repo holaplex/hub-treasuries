@@ -20,8 +20,8 @@ pub struct Model {
     /// [Vault Objects](https://docs.fireblocks.com/api/#vault-objects)
     #[sea_orm(unique)]
     pub vault_id: String,
-    /// The creation datetime of the vault.
-    pub created_at: DateTime,
+    /// The creation DateTimeWithTimeZone of the vault.
+    pub created_at: DateTimeWithTimeZone,
 }
 
 #[ComplexObject]
@@ -61,35 +61,23 @@ impl Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(
-        belongs_to = "super::customer_treasuries::Entity",
-        from = "Column::Id",
-        to = "super::customer_treasuries::Column::TreasuryId",
-        on_update = "Cascade",
-        on_delete = "Cascade"
-    )]
-    CustomerTreasury,
-    #[sea_orm(
-        belongs_to = "super::project_treasuries::Entity",
-        from = "Column::Id",
-        to = "super::project_treasuries::Column::TreasuryId",
-        on_update = "Cascade",
-        on_delete = "Cascade"
-    )]
-    ProjectTreasury,
+    #[sea_orm(has_one = "super::customer_treasuries::Entity")]
+    CustomerTreasuries,
+    #[sea_orm(has_one = "super::project_treasuries::Entity")]
+    ProjectTreasuries,
     #[sea_orm(has_many = "super::wallets::Entity")]
     Wallets,
 }
 
 impl Related<super::customer_treasuries::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::CustomerTreasury.def()
+        Relation::CustomerTreasuries.def()
     }
 }
 
 impl Related<super::project_treasuries::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::ProjectTreasury.def()
+        Relation::ProjectTreasuries.def()
     }
 }
 
@@ -98,6 +86,7 @@ impl Related<super::wallets::Entity> for Entity {
         Relation::Wallets.def()
     }
 }
+
 impl ActiveModelBehavior for ActiveModel {}
 
 #[derive(FromQueryResult)]
