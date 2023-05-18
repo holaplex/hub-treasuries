@@ -60,7 +60,7 @@ impl DataLoader<Uuid> for CustomerLoader {
         let treasuries = customer_treasuries::Entity::find()
             .join(
                 JoinType::InnerJoin,
-                customer_treasuries::Relation::Treasury.def(),
+                customer_treasuries::Relation::Treasuries.def(),
             )
             .select_also(treasuries::Entity)
             .filter(
