@@ -3,8 +3,13 @@ use fireblocks::objects::transaction::{
     TransactionStatus, TransferPeerPath, UnsignedMessage,
 };
 use hex::FromHex;
-use hub_core::{prelude::*, producer::Producer, tokio::time, uuid::Uuid};
-use sea_orm::{prelude::*, JoinType, QuerySelect, Set};
+use hub_core::{
+    prelude::*,
+    producer::Producer,
+    tokio::{time, try_join},
+    uuid::Uuid,
+};
+use sea_orm::{prelude::*, Set};
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{signature::Signature, transaction::Transaction as SplTransaction};
 
@@ -261,25 +266,21 @@ pub async fn create_raw_transaction(
         .ok_or_else(|| anyhow!("asset id not found for blockchain {:?}", blockchain))?)
     .to_string();
 
-    let (_, payer_signature) = create_transaction(
+    let fee_payer_signature_fut = create_transaction(
         fireblocks.clone(),
         asset_id.clone(),
         treasury_vault_id,
         &serialized_message,
         &note,
-    )
-    .await?;
+    );
 
-    let (tx_details, project_treasury_signature) = create_transaction(
-        fireblocks.clone(),
-        asset_id,
-        vault,
-        &serialized_message,
-        &note,
-    )
-    .await?;
+    let owner_signature_fut =
+        create_transaction(fireblocks, asset_id, vault, &serialized_message, &note);
 
-    signed_signatures.extend([payer_signature, project_treasury_signature]);
+    let ((_, fee_payer_signature), (tx_details, owner_signature)) =
+        try_join!(fee_payer_signature_fut, owner_signature_fut,)?;
+
+    signed_signatures.extend([fee_payer_signature, owner_signature]);
 
     let decoded_message = bincode::deserialize(&serialized_message)?;
 

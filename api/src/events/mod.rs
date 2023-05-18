@@ -190,7 +190,7 @@ pub async fn process(
                         transaction: payload.transaction.context("transaction not found")?,
                         project_id: payload.project_id.clone(),
                         vault: vault.to_string(),
-                        tx_type: TxType::MintEdition,
+                        tx_type: TxType::UpdateMetadata,
                         treasury_vault_id,
                     })
                     .await

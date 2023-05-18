@@ -5,7 +5,7 @@ use holaplex_hub_treasuries::{
     db::Connection,
     events,
     handlers::{graphql_handler, health, playground},
-    initialize_blockchain_asset_ids, proto, AppState, Args, Services, Actions,
+    initialize_blockchain_asset_ids, proto, Actions, AppState, Args, Services,
 };
 use hub_core::{
     anyhow::Context as AnyhowContext,
