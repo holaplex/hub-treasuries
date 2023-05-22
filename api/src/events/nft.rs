@@ -284,7 +284,8 @@ pub async fn create_raw_transaction(
             TransactionStatus::SUBMITTED
             | TransactionStatus::QUEUED
             | TransactionStatus::BROADCASTING
-            | TransactionStatus::CONFIRMING => {
+            | TransactionStatus::CONFIRMING
+            | TransactionStatus::PENDING_SIGNATURE => {
                 interval.tick().await;
 
                 continue;
