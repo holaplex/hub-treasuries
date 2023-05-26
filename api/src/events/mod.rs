@@ -2,6 +2,7 @@ pub mod customer;
 pub mod nft;
 pub mod organization;
 use customer::create_customer_treasury;
+use fireblocks::objects::transaction::TransactionStatus;
 use hub_core::{prelude::*, producer::Producer};
 use nft::{
     create_raw_transaction, emit_drop_created_event, emit_drop_minted_event,
@@ -78,7 +79,8 @@ pub async fn process(
                     rpc,
                     TxType::CreateDrop,
                 )
-                .await?;
+                .await
+                .unwrap_or((TransactionStatus::FAILED, String::new()));
 
                 emit_drop_created_event(producer, key, payload.project_id, status, signature)
                     .await
@@ -100,7 +102,8 @@ pub async fn process(
                     rpc,
                     TxType::CreateDrop,
                 )
-                .await?;
+                .await
+                .unwrap_or((TransactionStatus::FAILED, String::new()));
 
                 emit_drop_retried_event(producer, key, payload.project_id, status, signature)
                     .await
@@ -122,7 +125,8 @@ pub async fn process(
                     rpc,
                     TxType::MintEdition,
                 )
-                .await?;
+                .await
+                .unwrap_or((TransactionStatus::FAILED, String::new()));
 
                 emit_drop_minted_event(
                     producer,
@@ -151,7 +155,8 @@ pub async fn process(
                     rpc,
                     TxType::MintEdition,
                 )
-                .await?;
+                .await
+                .unwrap_or((TransactionStatus::FAILED, String::new()));
 
                 emit_mint_retried_event(
                     producer,
@@ -180,7 +185,8 @@ pub async fn process(
                     rpc,
                     TxType::UpdateMetadata,
                 )
-                .await?;
+                .await
+                .unwrap_or((TransactionStatus::FAILED, String::new()));
 
                 emit_drop_updated_event(producer, key, DropUpdated {
                     project_id: payload.project_id,
@@ -210,9 +216,10 @@ pub async fn process(
                     rpc,
                     TxType::TransferMint,
                 )
-                .await?;
+                .await
+                .unwrap_or((TransactionStatus::FAILED, String::new()));
 
-                emit_mint_transfered_event(producer, key, payload, signature.to_string())
+                emit_mint_transfered_event(producer, key, payload, signature)
                     .await
                     .context("failed to emit mint_transfered event")?;
 
