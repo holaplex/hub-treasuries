@@ -127,17 +127,13 @@ impl Client {
     }
 
     #[must_use]
-    pub fn get(&self) -> GetBuilder {
-        GetBuilder {
-            client: self.clone(),
-        }
+    pub fn read(&self) -> ReadRequestBuilder {
+        ReadRequestBuilder(self.clone())
     }
 
     #[must_use]
-    pub fn post(&self) -> PostBuilder {
-        PostBuilder {
-            client: self.clone(),
-        }
+    pub fn create(&self) -> CreateRequestBuilder {
+        CreateRequestBuilder(self.clone())
     }
 
     /// Waits for a transaction to reach the "COMPLETED" status by periodically checking the transaction details.
@@ -161,7 +157,7 @@ impl Client {
         let mut interval = time::interval(time::Duration::from_millis(250));
 
         loop {
-            let tx_details = self.get().transaction(id.clone()).await?;
+            let tx_details = self.read().transaction(id.clone()).await?;
             let status = tx_details.clone().status;
 
             match status {
@@ -184,11 +180,9 @@ impl Client {
 }
 
 #[derive(Clone)]
-pub struct GetBuilder {
-    client: Client,
-}
+pub struct ReadRequestBuilder(Client);
 
-impl GetBuilder {
+impl ReadRequestBuilder {
     /// Sends a GET request to the specified path and deserializes the response body.
     ///
     /// # Arguments
@@ -206,131 +200,18 @@ impl GetBuilder {
     /// # Returns
     ///
     /// Deserialized response body of type `T`.
-    pub async fn send<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T> {
-        let url = self.client.base_url.join(path)?;
-
-        let mut req = self.client.http.get(url);
-
-        req = self.client.authenticate(req, path.to_owned(), ())?;
-
-        let response = req.send().await?.text().await?;
-
-        Ok(serde_json::from_str(&response)?)
-    }
-
-    /// Retrieves the details of a specific transaction based on the transaction ID.
-    ///
-    /// # Arguments
-    ///
-    /// * `txid` - Transaction ID.
-    ///
-    /// # Errors
-    ///
-    /// This function can fail if:
-    ///
-    /// * The GET request fails.
-    /// * Failed to deserialize the transaction details.
-    ///
-    /// # Returns
-    ///
-    /// Transaction details.
-
-    pub async fn transaction(&self, txid: String) -> Result<TransactionDetails> {
-        let endpoint = format!("/v1/transactions/{txid}");
-
-        self.send(&endpoint).await
-    }
-
-    /// Retrieves the details of a specific vault account based on the vault ID.
-    ///
-    /// # Arguments
-    ///
-    /// * `vault_id` - Vault account ID.
-    ///
-    /// # Errors
-    ///
-    /// This function can fail if:
-    ///
-    /// * The GET request fails.
-    /// * Failed to deserialize the vault account details.
-    ///
-    /// # Returns
-    ///
-    /// Vault account details.
-    pub async fn vault(&self, vault_id: String) -> Result<VaultAccount> {
-        let endpoint = format!("/v1/vault/accounts/{vault_id}");
-        self.send(&endpoint).await
-    }
-
-    /// Retrieves a list of vault assets.
-    ///
-    /// # Errors
-    ///
-    /// This function can fail if:
-    ///
-    /// * The GET request fails.
-    /// * Failed to deserialize the vault assets.
-    ///
-    /// # Returns
-    ///
-    /// List of vault assets.
-    pub async fn vault_assets(&self) -> Result<Vec<VaultAsset>> {
-        let endpoint = "/v1/vault/assets".to_string();
-        self.send(&endpoint).await
-    }
-
-    /// Retrieves a list of all transactions.
-    ///
-    /// # Errors
-    ///
-    /// This function can fail if:
-    ///
-    /// * The GET request fails.
-    /// * Failed to deserialize the transactions.
-    ///
-    /// # Returns
-    ///
-    /// List of transactions.
-    pub async fn transactions(&self) -> Result<Vec<TransactionDetails>> {
-        let endpoint = "/v1/transactions".to_string();
-        self.send(&endpoint).await
-    }
-}
-
-#[derive(Clone)]
-pub struct PostBuilder {
-    client: Client,
-}
-
-impl PostBuilder {
-    /// Sends a POST request to the specified path with the provided body and deserializes the response body.
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - API endpoint path.
-    /// * `body` - Request body for serialization.
-    ///
-    /// # Errors
-    ///
-    /// This function can fail if:
-    ///
-    /// * The URL parsing fails.
-    /// * The HTTP request fails.
-    /// * Failed to serialize the request body.
-    /// * Failed to deserialize the response body.
-    ///
-    /// # Returns
-    ///
-    /// Deserialized response body of type `T`.
     pub async fn send<T: serde::de::DeserializeOwned>(
         &self,
         path: &str,
         body: impl Serialize,
     ) -> Result<T> {
-        let url = self.client.base_url.join(path)?;
-        let mut req = self.client.http.post(url).json(&body);
+        let client = &self.0;
 
-        req = self.client.authenticate(req, path.to_owned(), body)?;
+        let url = client.base_url.join(path)?;
+
+        let mut req = client.http.get(url);
+
+        req = client.authenticate(req, path.to_owned(), body)?;
 
         let response = req.send().await?.text().await?;
 
@@ -358,6 +239,123 @@ impl PostBuilder {
         let endpoint = "/v1/vault/accounts_paged";
         self.send(endpoint, filters).await
     }
+    /// Retrieves the details of a specific transaction based on the transaction ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `txid` - Transaction ID.
+    ///
+    /// # Errors
+    ///
+    /// This function can fail if:
+    ///
+    /// * The GET request fails.
+    /// * Failed to deserialize the transaction details.
+    ///
+    /// # Returns
+    ///
+    /// Transaction details.
+
+    pub async fn transaction(&self, txid: String) -> Result<TransactionDetails> {
+        let endpoint = format!("/v1/transactions/{txid}");
+
+        self.send(&endpoint, ()).await
+    }
+
+    /// Retrieves the details of a specific vault account based on the vault ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `vault_id` - Vault account ID.
+    ///
+    /// # Errors
+    ///
+    /// This function can fail if:
+    ///
+    /// * The GET request fails.
+    /// * Failed to deserialize the vault account details.
+    ///
+    /// # Returns
+    ///
+    /// Vault account details.
+    pub async fn vault(&self, vault_id: String) -> Result<VaultAccount> {
+        let endpoint = format!("/v1/vault/accounts/{vault_id}");
+        self.send(&endpoint, ()).await
+    }
+
+    /// Retrieves a list of vault assets.
+    ///
+    /// # Errors
+    ///
+    /// This function can fail if:
+    ///
+    /// * The GET request fails.
+    /// * Failed to deserialize the vault assets.
+    ///
+    /// # Returns
+    ///
+    /// List of vault assets.
+    pub async fn vault_assets(&self) -> Result<Vec<VaultAsset>> {
+        let endpoint = "/v1/vault/assets".to_string();
+        self.send(&endpoint, ()).await
+    }
+
+    /// Retrieves a list of all transactions.
+    ///
+    /// # Errors
+    ///
+    /// This function can fail if:
+    ///
+    /// * The GET request fails.
+    /// * Failed to deserialize the transactions.
+    ///
+    /// # Returns
+    ///
+    /// List of transactions.
+    pub async fn transactions(&self) -> Result<Vec<TransactionDetails>> {
+        let endpoint = "/v1/transactions".to_string();
+        self.send(&endpoint, ()).await
+    }
+}
+
+#[derive(Clone)]
+pub struct CreateRequestBuilder(Client);
+
+impl CreateRequestBuilder {
+    /// Sends a POST request to the specified path with the provided body and deserializes the response body.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - API endpoint path.
+    /// * `body` - Request body for serialization.
+    ///
+    /// # Errors
+    ///
+    /// This function can fail if:
+    ///
+    /// * The URL parsing fails.
+    /// * The HTTP request fails.
+    /// * Failed to serialize the request body.
+    /// * Failed to deserialize the response body.
+    ///
+    /// # Returns
+    ///
+    /// Deserialized response body of type `T`.
+    pub async fn send<T: serde::de::DeserializeOwned>(
+        &self,
+        path: &str,
+        body: impl Serialize,
+    ) -> Result<T> {
+        let client = &self.0;
+        let url = client.base_url.join(path)?;
+        let mut req = client.http.post(url).json(&body);
+
+        req = client.authenticate(req, path.to_owned(), body)?;
+
+        let response = req.send().await?.text().await?;
+
+        Ok(serde_json::from_str(&response)?)
+    }
 
     /// Creates a new vault account with the provided details.
     ///
@@ -376,7 +374,7 @@ impl PostBuilder {
     /// # Returns
     ///
     /// Created vault account details.
-    pub async fn create_vault(&self, body: CreateVault) -> Result<VaultAccount> {
+    pub async fn vault(&self, body: CreateVault) -> Result<VaultAccount> {
         let endpoint = "/v1/vault/accounts".to_string();
         self.send(&endpoint, body).await
     }
@@ -400,7 +398,7 @@ impl PostBuilder {
     /// # Returns
     ///
     /// Created vault wallet details.
-    pub async fn create_vault_wallet(
+    pub async fn wallet(
         &self,
         vault_account_id: String,
         asset_id: String,
@@ -427,10 +425,7 @@ impl PostBuilder {
     /// # Returns
     ///
     /// Created transaction details.
-    pub async fn create_transaction(
-        &self,
-        tx: CreateTransaction,
-    ) -> Result<CreateTransactionResponse> {
+    pub async fn transaction(&self, tx: CreateTransaction) -> Result<CreateTransactionResponse> {
         let endpoint = "/v1/transactions".to_string();
         self.send(&endpoint, tx).await
     }
@@ -455,7 +450,7 @@ impl PostBuilder {
     /// # Returns
     ///
     /// Created transaction details.
-    pub async fn sign_message(
+    pub async fn raw_transaction(
         &self,
         asset_id: String,
         vault_id: String,

@@ -45,8 +45,8 @@ impl CustomerEventHandler for Processor {
         let vault = self
             .fireblocks
             .client()
-            .post()
-            .create_vault(create_vault)
+            .create()
+            .vault(create_vault)
             .await?;
 
         info!("vault created {:?}", vault);

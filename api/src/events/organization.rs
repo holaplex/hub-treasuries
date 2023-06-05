@@ -58,8 +58,8 @@ impl OrganizationEventHandler for Processor {
         let vault = self
             .fireblocks
             .client()
-            .post()
-            .create_vault(create_vault)
+            .create()
+            .vault(create_vault)
             .await?;
 
         let treasury = treasuries::ActiveModel {
@@ -95,8 +95,8 @@ impl OrganizationEventHandler for Processor {
             let vault_asset = self
                 .fireblocks
                 .client()
-                .post()
-                .create_vault_wallet(
+                .create()
+                .wallet(
                     treasury.vault_id.clone(),
                     asset_type.into(),
                     CreateVaultWallet {
