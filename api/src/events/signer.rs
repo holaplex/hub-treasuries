@@ -64,8 +64,8 @@ impl Signer {
         let transaction = self
             .fireblocks
             .client()
-            .post()
-            .sign_message(
+            .create()
+            .raw_transaction(
                 wallet.asset_id.into(),
                 self.vault_id.to_string(),
                 serialized_message,
