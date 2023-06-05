@@ -7,6 +7,7 @@ pub struct Assets {
 }
 
 impl Assets {
+    #[must_use]
     pub fn new(args: FbArgs) -> Self {
         let ids = args.fireblocks_supported_asset_ids;
         let test_mode = args.fireblocks_test_mode;
@@ -20,10 +21,12 @@ impl Assets {
         Self { ids, test_mode }
     }
 
+    #[must_use]
     pub fn ids(&self) -> &Vec<String> {
         &self.ids
     }
 
+    #[must_use]
     pub fn test_mode(&self) -> bool {
         self.test_mode
     }

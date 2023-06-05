@@ -42,7 +42,12 @@ impl CustomerEventHandler for Processor {
             auto_fuel: Some(false),
         };
 
-        let vault = self.fireblocks.client().create_vault(create_vault).await?;
+        let vault = self
+            .fireblocks
+            .client()
+            .post()
+            .create_vault(create_vault)
+            .await?;
 
         info!("vault created {:?}", vault);
 
