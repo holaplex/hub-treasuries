@@ -55,7 +55,6 @@ impl Fireblocks {
         &self.assets
     }
 
-
     #[must_use]
     pub fn client(&self) -> &Client {
         &self.client
