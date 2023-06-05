@@ -1,6 +1,7 @@
 use hub_core::{
     anyhow::{Context as _, Result},
-    clap, serde_json,
+    serde_json, thiserror,
+    tokio::time,
     tracing::info,
 };
 use jsonwebtoken::EncodingKey;
@@ -9,24 +10,17 @@ use serde::Serialize;
 
 use crate::{
     objects::{
-        transaction::{CreateTransaction, CreateTransactionResponse, TransactionDetails},
+        transaction::{
+            CreateTransaction, CreateTransactionResponse, TransactionDetails, TransactionStatus,
+        },
         vault::{
             CreateVault, CreateVaultAssetResponse, CreateVaultWallet, QueryVaultAccounts,
             VaultAccount, VaultAccountsPagedResponse, VaultAsset,
         },
     },
     signer::RequestSigner,
+    FbArgs,
 };
-
-#[derive(clap::Args, Clone, Debug)]
-pub struct FbArgs {
-    #[arg(long, env)]
-    pub fireblocks_endpoint: String,
-    #[arg(long, env)]
-    pub fireblocks_api_key: String,
-    #[arg(long, env)]
-    pub secret_path: String,
-}
 
 #[allow(missing_debug_implementations)]
 #[derive(Clone)]
@@ -35,6 +29,12 @@ pub struct Client {
     request_signer: RequestSigner,
     base_url: Url,
     api_key: String,
+}
+
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+pub enum ClientError {
+    #[error("failed to sign transaction")]
+    Transaction(TransactionStatus),
 }
 
 impl Client {
@@ -46,12 +46,13 @@ impl Client {
         let FbArgs {
             fireblocks_endpoint,
             fireblocks_api_key,
-            secret_path,
+            fireblocks_secret_path,
+            ..
         } = args;
 
         let http = HttpClient::new();
 
-        let encoding_key = Self::build_encoding_key(secret_path)?;
+        let encoding_key = Self::build_encoding_key(fireblocks_secret_path)?;
 
         let base_url =
             Url::parse(&fireblocks_endpoint).context("failed to parse fireblocks endpoint")?;
@@ -87,6 +88,32 @@ impl Client {
 
         Ok(req.header("X-API-KEY", &self.api_key).bearer_auth(token))
     }
+
+    pub async fn wait_on_transaction_completion(&self, id: String) -> Result<TransactionDetails> {
+        let mut interval = time::interval(time::Duration::from_millis(250));
+
+        loop {
+            let tx_details = self.get_transaction(id.clone()).await?;
+            let status = tx_details.clone().status;
+
+            match status {
+                TransactionStatus::SUBMITTED
+                | TransactionStatus::QUEUED
+                | TransactionStatus::BROADCASTING
+                | TransactionStatus::CONFIRMING
+                | TransactionStatus::PENDING_SIGNATURE => {
+                    interval.tick().await;
+
+                    continue;
+                },
+                TransactionStatus::COMPLETED => {
+                    break Ok(tx_details);
+                },
+                _ => return Err(ClientError::Transaction(status).into()),
+            }
+        }
+    }
+
     /// Res
     ///
     /// # Errors

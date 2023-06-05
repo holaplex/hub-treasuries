@@ -45,6 +45,7 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/organization.proto.rs"));
     include!(concat!(env!("OUT_DIR"), "/customer.proto.rs"));
     include!(concat!(env!("OUT_DIR"), "/nfts.proto.rs"));
+    include!(concat!(env!("OUT_DIR"), "/solana_nfts.proto.rs"));
     include!(concat!(env!("OUT_DIR"), "/treasury.proto.rs"));
 }
 
@@ -52,11 +53,12 @@ pub mod proto {
 pub enum Services {
     Organizations(proto::OrganizationEventKey, proto::OrganizationEvents),
     Customers(proto::CustomerEventKey, proto::CustomerEvents),
-    Nfts(proto::NftEventKey, proto::NftEvents),
+    Solana(proto::SolanaNftEventKey, proto::SolanaNftEvents),
 }
 
 impl hub_core::consumer::MessageGroup for Services {
-    const REQUESTED_TOPICS: &'static [&'static str] = &["hub-orgs", "hub-customers", "hub-nfts"];
+    const REQUESTED_TOPICS: &'static [&'static str] =
+        &["hub-orgs", "hub-customers", "hub-nfts-solana"];
 
     fn from_message<M: hub_core::consumer::Message>(msg: &M) -> Result<Self, RecvError> {
         let topic = msg.topic();
@@ -77,11 +79,11 @@ impl hub_core::consumer::MessageGroup for Services {
 
                 Ok(Services::Customers(key, val))
             },
-            "hub-nfts" => {
-                let key = proto::NftEventKey::decode(key)?;
-                let val = proto::NftEvents::decode(val)?;
+            "hub-nfts-solana" => {
+                let key = proto::SolanaNftEventKey::decode(key)?;
+                let val = proto::SolanaNftEvents::decode(val)?;
 
-                Ok(Services::Nfts(key, val))
+                Ok(Services::Solana(key, val))
             },
             t => Err(RecvError::BadTopic(t.into())),
         }
@@ -188,12 +190,6 @@ impl From<Actions> for hub_core::credits::Action {
 pub struct Args {
     #[arg(short, long, env, default_value_t = 3007)]
     pub port: u16,
-
-    #[arg(short, long, env)]
-    pub solana_endpoint: String,
-
-    #[arg(short, long, env, value_delimiter = ',')]
-    pub fireblocks_supported_asset_ids: Vec<String>,
 
     #[command(flatten)]
     pub db: db::DbArgs,
