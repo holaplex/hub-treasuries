@@ -83,6 +83,7 @@ impl Mutation {
         .await?;
 
         let vault_asset = fireblocks
+            .post()
             .create_vault_wallet(
                 treasury.vault_id.clone(),
                 asset_type.into(),

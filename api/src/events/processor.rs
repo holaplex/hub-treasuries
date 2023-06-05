@@ -3,9 +3,8 @@ use hub_core::{prelude::*, producer::Producer, uuid::Uuid};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 
 use super::{
-    customer::CustomerEventHandler,
-    organization::OrganizationEventHandler,
-    solana::{Solana, SolanaTransactionSigner},
+    customer::CustomerEventHandler, organization::OrganizationEventHandler,
+    signer::TransactionSigner, solana::Solana,
 };
 use crate::{
     db::Connection,
@@ -25,14 +24,18 @@ pub struct Processor {
 }
 
 impl Processor {
+    #[must_use]
     pub fn new(db: Connection, producer: Producer<TreasuryEvents>, fireblocks: Fireblocks) -> Self {
         Self {
             db,
-            producer,
             fireblocks,
+            producer,
         }
     }
 
+    /// Processes a message from the event stream.
+    /// # Errors
+    /// Returns an error if the message cannot be processed.
     pub async fn process(&self, msg: Services) -> Result<()> {
         // match topics
         match msg {
@@ -63,7 +66,7 @@ impl Processor {
                         let signed_transaction = signer.create_drop(key.clone(), payload).await?;
 
                         event_emitter
-                            .create_drop_signed(key, signed_transaction)
+                            .create_drop_signed(key.into(), signed_transaction)
                             .await?;
 
                         Ok(())
@@ -72,7 +75,7 @@ impl Processor {
                         let signed_transaction = signer.update_drop(key.clone(), payload).await?;
 
                         event_emitter
-                            .update_drop_signed(key, signed_transaction)
+                            .update_drop_signed(key.into(), signed_transaction)
                             .await?;
                         Ok(())
                     },
@@ -80,7 +83,7 @@ impl Processor {
                         let signed_transaction = signer.mint_drop(key.clone(), payload).await?;
 
                         event_emitter
-                            .mint_drop_signed(key, signed_transaction)
+                            .mint_drop_signed(key.into(), signed_transaction)
                             .await?;
 
                         Ok(())
@@ -90,7 +93,7 @@ impl Processor {
                             signer.transfer_asset(key.clone(), payload).await?;
 
                         event_emitter
-                            .transfer_asset_signed(key, signed_transaction)
+                            .transfer_asset_signed(key.into(), signed_transaction)
                             .await?;
 
                         Ok(())
@@ -100,7 +103,7 @@ impl Processor {
                             signer.retry_mint_drop(key.clone(), payload).await?;
 
                         event_emitter
-                            .retry_create_drop_signed(key, signed_transaction)
+                            .retry_create_drop_signed(key.into(), signed_transaction)
                             .await?;
 
                         Ok(())
@@ -110,7 +113,7 @@ impl Processor {
                             signer.retry_mint_drop(key.clone(), payload).await?;
 
                         event_emitter
-                            .retry_mint_drop_signed(key, signed_transaction)
+                            .retry_mint_drop_signed(key.into(), signed_transaction)
                             .await?;
 
                         Ok(())

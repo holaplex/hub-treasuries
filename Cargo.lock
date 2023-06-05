@@ -196,9 +196,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "5.0.8"
+version = "5.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ae09afb01514b3dbd6328547b2b11fcbcb0205d9c5e6f2e17e60cb166a82d7f"
+checksum = "364423936c4b828ac1615ce325e528c5afbe6e6995d799ee5683c7d36720dfa4"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -235,9 +235,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "5.0.8"
+version = "5.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60ae62851dd3ff9a7550aee75e848e8834b75285b458753e98dd71d0733ad3f2"
+checksum = "23a06320343bbe0a1f2e29ec6d1ed34e0460f10e6827b3154a78e4ccc039dbc4"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -251,9 +251,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-parser"
-version = "5.0.8"
+version = "5.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e6ee332acd99d2c50c3443beae46e9ed784c205eead9a668b7b5118b4a60a8b"
+checksum = "46ce3b4b57e2a4630ea5e69eeb02fb5ee3c5f48754fcf7fd6a7bf3b4f96538f0"
 dependencies = [
  "async-graphql-value",
  "pest",
@@ -263,9 +263,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-poem"
-version = "5.0.8"
+version = "5.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c714cf530b5b4d5dec0d177be059a76bcd6823824564f74254ce24a9fccee73b"
+checksum = "90652566571512af3047db3502b5ec149b0fab9e6b7d7be0f4aff6621da0f676"
 dependencies = [
  "async-graphql",
  "futures-util",
@@ -276,9 +276,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-value"
-version = "5.0.8"
+version = "5.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "122da50452383410545b9428b579f4cda5616feb6aa0aff0003500c53fcff7b7"
+checksum = "637c6b5a755133d47c9829df04b7a5e2f1856fe4c1101f581650c93198eba103"
 dependencies = [
  "bytes 1.4.0",
  "indexmap",
@@ -441,6 +441,17 @@ name = "base64"
 version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4a4ddaa51a5bc52a6948f74c06d20aaaddb71924eab79b8c97a8c556e942d6a"
+
+[[package]]
+name = "bigdecimal"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6773ddc0eafc0e509fb60e48dff7f450f8e674a0686ae8605e8d9901bd5eefa"
+dependencies = [
+ "num-bigint",
+ "num-integer",
+ "num-traits",
+]
 
 [[package]]
 name = "bincode"
@@ -736,21 +747,6 @@ checksum = "3e4c1eaa2012c47becbbad2ab175484c2a84d1185b566fb2cc5b8707343dfe58"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "crc"
-version = "3.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86ec7a15cbe22e59248fc7eadb1907dab5ba09372595da4d73dd805ed4417dfe"
-dependencies = [
- "crc-catalog",
-]
-
-[[package]]
-name = "crc-catalog"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9cace84e55f07e7301bae1c519df89cdad8cc3cd868413d3fdbdeca9ff3db484"
 
 [[package]]
 name = "crossbeam-queue"
@@ -1423,7 +1419,7 @@ dependencies = [
  "holaplex-hub-core-build",
  "poem",
  "prost",
- "sea-orm 0.10.7",
+ "sea-orm",
  "serde",
  "strum",
 ]
@@ -2542,9 +2538,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.11.17"
+version = "0.11.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13293b639a097af28fc8a90f22add145a9c954e49d77da06263d58cf44d5fb91"
+checksum = "cde824a14b7c14f85caff81225f411faacc04a2013f41670f41443742b1c1c55"
 dependencies = [
  "base64 0.21.0",
  "bytes 1.4.0",
@@ -2741,21 +2737,21 @@ dependencies = [
 
 [[package]]
 name = "sea-orm"
-version = "0.10.7"
+version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88694d01b528a94f90ad87f8d2f546d060d070eee180315c67d158cb69476034"
+checksum = "fade86e8d41fd1a4721f84cb834f4ca2783f973cc30e6212b7fafc134f169214"
 dependencies = [
  "async-stream",
  "async-trait",
+ "bigdecimal",
  "chrono",
  "futures",
- "futures-util",
  "log",
  "ouroboros",
  "rust_decimal",
- "sea-orm-macros 0.10.7",
- "sea-query 0.27.2",
- "sea-query-binder 0.2.2",
+ "sea-orm-macros",
+ "sea-query",
+ "sea-query-binder",
  "sea-strum",
  "serde",
  "serde_json",
@@ -2765,28 +2761,6 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
-]
-
-[[package]]
-name = "sea-orm"
-version = "0.11.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fade86e8d41fd1a4721f84cb834f4ca2783f973cc30e6212b7fafc134f169214"
-dependencies = [
- "async-stream",
- "async-trait",
- "futures",
- "log",
- "ouroboros",
- "sea-orm-macros 0.11.3",
- "sea-query 0.28.5",
- "sea-query-binder 0.3.1",
- "sea-strum",
- "serde",
- "sqlx",
- "thiserror",
- "tracing",
- "url",
 ]
 
 [[package]]
@@ -2803,19 +2777,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
-]
-
-[[package]]
-name = "sea-orm-macros"
-version = "0.10.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7216195de9c6b2474fd0efab486173dccd0eff21f28cc54aa4c0205d52fb3af0"
-dependencies = [
- "bae",
- "heck 0.3.3",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -2841,7 +2802,7 @@ dependencies = [
  "clap 3.2.25",
  "dotenvy",
  "futures",
- "sea-orm 0.11.3",
+ "sea-orm",
  "sea-orm-cli",
  "sea-schema",
  "tracing",
@@ -2850,38 +2811,15 @@ dependencies = [
 
 [[package]]
 name = "sea-query"
-version = "0.27.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4f0fc4d8e44e1d51c739a68d336252a18bc59553778075d5e32649be6ec92ed"
-dependencies = [
- "chrono",
- "rust_decimal",
- "sea-query-derive 0.2.0",
- "serde_json",
- "time 0.3.21",
- "uuid",
-]
-
-[[package]]
-name = "sea-query"
 version = "0.28.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbab99b8cd878ab7786157b7eb8df96333a6807cc6e45e8888c85b51534b401a"
 dependencies = [
- "sea-query-derive 0.3.0",
-]
-
-[[package]]
-name = "sea-query-binder"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c2585b89c985cfacfe0ec9fc9e7bb055b776c1a2581c4e3c6185af2b8bf8865"
-dependencies = [
+ "bigdecimal",
  "chrono",
  "rust_decimal",
- "sea-query 0.27.2",
+ "sea-query-derive",
  "serde_json",
- "sqlx",
  "time 0.3.21",
  "uuid",
 ]
@@ -2892,21 +2830,14 @@ version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4cea85029985b40dfbf18318d85fe985c04db7c1b4e5e8e0a0a0cdff5f1e30f9"
 dependencies = [
- "sea-query 0.28.5",
+ "bigdecimal",
+ "chrono",
+ "rust_decimal",
+ "sea-query",
+ "serde_json",
  "sqlx",
-]
-
-[[package]]
-name = "sea-query-derive"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34cdc022b4f606353fe5dc85b09713a04e433323b70163e81513b141c6ae6eb5"
-dependencies = [
- "heck 0.3.3",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
- "thiserror",
+ "time 0.3.21",
+ "uuid",
 ]
 
 [[package]]
@@ -2929,7 +2860,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eeb2940bb5a10bc6cd05b450ce6cd3993e27fddd7eface2becb97fc5af3a040e"
 dependencies = [
  "futures",
- "sea-query 0.28.5",
+ "sea-query",
  "sea-schema-derive",
 ]
 
@@ -3208,11 +3139,11 @@ dependencies = [
  "ahash 0.7.6",
  "atoi",
  "base64 0.13.1",
+ "bigdecimal",
  "bitflags",
  "byteorder",
  "bytes 1.4.0",
  "chrono",
- "crc",
  "crossbeam-queue",
  "dirs",
  "dotenvy",
@@ -3270,7 +3201,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde_json",
- "sha2",
  "sqlx-core",
  "sqlx-rt",
  "syn 1.0.109",

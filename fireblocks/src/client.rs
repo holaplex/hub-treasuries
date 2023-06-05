@@ -37,7 +37,7 @@ pub struct Client {
 }
 
 #[derive(Debug, Clone, Copy, thiserror::Error)]
-pub enum ClientError {
+pub enum Error {
     #[error("failed to sign transaction")]
     Transaction(TransactionStatus),
 }
@@ -126,12 +126,14 @@ impl Client {
         Ok(req.header("X-API-KEY", &self.api_key).bearer_auth(token))
     }
 
+    #[must_use]
     pub fn get(&self) -> GetBuilder {
         GetBuilder {
             client: self.clone(),
         }
     }
 
+    #[must_use]
     pub fn post(&self) -> PostBuilder {
         PostBuilder {
             client: self.clone(),
@@ -175,7 +177,7 @@ impl Client {
                 TransactionStatus::COMPLETED => {
                     break Ok(tx_details);
                 },
-                _ => return Err(ClientError::Transaction(status).into()),
+                _ => return Err(Error::Transaction(status).into()),
             }
         }
     }

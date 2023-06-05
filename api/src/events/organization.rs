@@ -2,7 +2,7 @@ use fireblocks::objects::vault::{CreateVault, CreateVaultWallet};
 use hub_core::{prelude::*, uuid::Uuid};
 use sea_orm::{prelude::*, Set};
 
-use super::processor::Processor;
+use super::Processor;
 use crate::{
     entities::{
         project_treasuries, treasuries,
@@ -55,7 +55,12 @@ impl OrganizationEventHandler for Processor {
             auto_fuel: Some(false),
         };
 
-        let vault = self.fireblocks.client().create_vault(create_vault).await?;
+        let vault = self
+            .fireblocks
+            .client()
+            .post()
+            .create_vault(create_vault)
+            .await?;
 
         let treasury = treasuries::ActiveModel {
             vault_id: Set(vault.id.clone()),
@@ -90,6 +95,7 @@ impl OrganizationEventHandler for Processor {
             let vault_asset = self
                 .fireblocks
                 .client()
+                .post()
                 .create_vault_wallet(
                     treasury.vault_id.clone(),
                     asset_type.into(),
