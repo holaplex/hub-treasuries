@@ -1,8 +1,10 @@
+#![allow(missing_debug_implementations)]
+
 use hub_core::{
     anyhow::{Context as _, Result},
-    serde_json, thiserror,
+    serde_json::{self},
+    thiserror,
     tokio::time,
-    tracing::info,
 };
 use jsonwebtoken::EncodingKey;
 use reqwest::{Client as HttpClient, RequestBuilder, Url};
@@ -11,7 +13,9 @@ use serde::Serialize;
 use crate::{
     objects::{
         transaction::{
-            CreateTransaction, CreateTransactionResponse, TransactionDetails, TransactionStatus,
+            CreateTransaction, CreateTransactionResponse, ExtraParameters, RawMessageData,
+            TransactionDetails, TransactionOperation, TransactionStatus, TransferPeerPath,
+            UnsignedMessage,
         },
         vault::{
             CreateVault, CreateVaultAssetResponse, CreateVaultWallet, QueryVaultAccounts,
@@ -22,7 +26,8 @@ use crate::{
     FbArgs,
 };
 
-#[allow(missing_debug_implementations)]
+/// Represents a Fireblocks API client.
+/// It contains an HTTP client, a request signer, the base URL for the Fireblocks endpoint, and an API key.
 #[derive(Clone)]
 pub struct Client {
     http: HttpClient,
@@ -38,10 +43,19 @@ pub enum ClientError {
 }
 
 impl Client {
-    /// Res
+    /// Constructs a new Fireblocks API client.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Fireblocks API client arguments containing endpoint, API key, and secret path.
     ///
     /// # Errors
-    /// This function fails if ...
+    ///
+    /// This function can fail if:
+    ///
+    /// * Failed to parse the Fireblocks endpoint URL.
+    /// * Failed to read the secret key file.
+    /// * Failed to create an encoding key from the secret key.
     pub fn new(args: FbArgs) -> Result<Self> {
         let FbArgs {
             fireblocks_endpoint,
@@ -64,20 +78,43 @@ impl Client {
             api_key: fireblocks_api_key,
         })
     }
-    /// Res
+
+    /// Builds an encoding key from the provided secret key file path.
+    ///
+    /// # Arguments
+    ///
+    /// * `secret_path` - Path to the secret key file.
     ///
     /// # Errors
-    /// This function fails if ...
-
+    ///
+    /// This function can fail if:
+    ///
+    /// * Failed to read the secret key file.
+    /// * Failed to create an encoding key from the secret key.
     fn build_encoding_key(secret_path: String) -> Result<EncodingKey> {
         let rsa = std::fs::read(secret_path).context("failed to read secret key")?;
 
         EncodingKey::from_rsa_pem(&rsa).context("failed to create encoding key")
     }
-    /// Res
+
+    /// Authenticates the request by signing it and adding necessary headers.
+    ///
+    /// # Arguments
+    ///
+    /// * `req` - Request builder for the HTTP request.
+    /// * `endpoint` - API endpoint path.
+    /// * `body` - Request body for serialization.
     ///
     /// # Errors
-    /// This function fails if ...
+    ///
+    /// This function can fail if:
+    ///
+    /// * Failed to sign the request.
+    ///
+    /// # Returns
+    ///
+    /// A `RequestBuilder` with added authentication headers.
+
     fn authenticate(
         &self,
         req: RequestBuilder,
@@ -89,11 +126,40 @@ impl Client {
         Ok(req.header("X-API-KEY", &self.api_key).bearer_auth(token))
     }
 
+    pub fn get(&self) -> GetBuilder {
+        GetBuilder {
+            client: self.clone(),
+        }
+    }
+
+    pub fn post(&self) -> PostBuilder {
+        PostBuilder {
+            client: self.clone(),
+        }
+    }
+
+    /// Waits for a transaction to reach the "COMPLETED" status by periodically checking the transaction details.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Transaction ID.
+    ///
+    /// # Errors
+    ///
+    /// This function can fail if:
+    ///
+    /// * The GET request fails.
+    /// * Failed to deserialize the transaction details.
+    /// * The transaction status is not one of the expected states.
+    ///
+    /// # Returns
+    ///
+    /// Transaction details when the transaction is completed.
     pub async fn wait_on_transaction_completion(&self, id: String) -> Result<TransactionDetails> {
         let mut interval = time::interval(time::Duration::from_millis(250));
 
         loop {
-            let tx_details = self.get_transaction(id.clone()).await?;
+            let tx_details = self.get().transaction(id.clone()).await?;
             let status = tx_details.clone().status;
 
             match status {
@@ -113,65 +179,225 @@ impl Client {
             }
         }
     }
+}
 
-    /// Res
+#[derive(Clone)]
+pub struct GetBuilder {
+    client: Client,
+}
+
+impl GetBuilder {
+    /// Sends a GET request to the specified path and deserializes the response body.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - API endpoint path.
     ///
     /// # Errors
-    /// This function fails if ...
-    pub async fn get_vaults(
-        &self,
-        filters: QueryVaultAccounts,
-    ) -> Result<VaultAccountsPagedResponse> {
-        let endpoint = "/v1/vault/accounts_paged";
-        let url = self.base_url.join(endpoint)?;
+    ///
+    /// This function can fail if:
+    ///
+    /// * The URL parsing fails.
+    /// * The HTTP request fails.
+    /// * Failed to deserialize the response body.
+    ///
+    /// # Returns
+    ///
+    /// Deserialized response body of type `T`.
+    pub async fn send<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T> {
+        let url = self.client.base_url.join(path)?;
 
-        let mut req = self.http.get(url);
-        req = self.authenticate(req, endpoint.to_string(), filters)?;
+        let mut req = self.client.http.get(url);
+
+        req = self.client.authenticate(req, path.to_owned(), ())?;
 
         let response = req.send().await?.text().await?;
 
-        info!("{:?}", response);
-
         Ok(serde_json::from_str(&response)?)
     }
-    /// Res
+
+    /// Retrieves the details of a specific transaction based on the transaction ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `txid` - Transaction ID.
     ///
     /// # Errors
-    /// This function fails if ...
-    pub async fn get_vault(&self, vault_id: String) -> Result<VaultAccount> {
+    ///
+    /// This function can fail if:
+    ///
+    /// * The GET request fails.
+    /// * Failed to deserialize the transaction details.
+    ///
+    /// # Returns
+    ///
+    /// Transaction details.
+
+    pub async fn transaction(&self, txid: String) -> Result<TransactionDetails> {
+        let endpoint = format!("/v1/transactions/{txid}");
+
+        self.send(&endpoint).await
+    }
+
+    /// Retrieves the details of a specific vault account based on the vault ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `vault_id` - Vault account ID.
+    ///
+    /// # Errors
+    ///
+    /// This function can fail if:
+    ///
+    /// * The GET request fails.
+    /// * Failed to deserialize the vault account details.
+    ///
+    /// # Returns
+    ///
+    /// Vault account details.
+    pub async fn vault(&self, vault_id: String) -> Result<VaultAccount> {
         let endpoint = format!("/v1/vault/accounts/{vault_id}");
-        let url = self.base_url.join(&endpoint)?;
+        self.send(&endpoint).await
+    }
 
-        let mut req = self.http.get(url);
-        req = self.authenticate(req, endpoint, ())?;
+    /// Retrieves a list of vault assets.
+    ///
+    /// # Errors
+    ///
+    /// This function can fail if:
+    ///
+    /// * The GET request fails.
+    /// * Failed to deserialize the vault assets.
+    ///
+    /// # Returns
+    ///
+    /// List of vault assets.
+    pub async fn vault_assets(&self) -> Result<Vec<VaultAsset>> {
+        let endpoint = "/v1/vault/assets".to_string();
+        self.send(&endpoint).await
+    }
+
+    /// Retrieves a list of all transactions.
+    ///
+    /// # Errors
+    ///
+    /// This function can fail if:
+    ///
+    /// * The GET request fails.
+    /// * Failed to deserialize the transactions.
+    ///
+    /// # Returns
+    ///
+    /// List of transactions.
+    pub async fn transactions(&self) -> Result<Vec<TransactionDetails>> {
+        let endpoint = "/v1/transactions".to_string();
+        self.send(&endpoint).await
+    }
+}
+
+#[derive(Clone)]
+pub struct PostBuilder {
+    client: Client,
+}
+
+impl PostBuilder {
+    /// Sends a POST request to the specified path with the provided body and deserializes the response body.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - API endpoint path.
+    /// * `body` - Request body for serialization.
+    ///
+    /// # Errors
+    ///
+    /// This function can fail if:
+    ///
+    /// * The URL parsing fails.
+    /// * The HTTP request fails.
+    /// * Failed to serialize the request body.
+    /// * Failed to deserialize the response body.
+    ///
+    /// # Returns
+    ///
+    /// Deserialized response body of type `T`.
+    pub async fn send<T: serde::de::DeserializeOwned>(
+        &self,
+        path: &str,
+        body: impl Serialize,
+    ) -> Result<T> {
+        let url = self.client.base_url.join(path)?;
+        let mut req = self.client.http.post(url).json(&body);
+
+        req = self.client.authenticate(req, path.to_owned(), body)?;
 
         let response = req.send().await?.text().await?;
 
-        info!("{:?}", response);
-
         Ok(serde_json::from_str(&response)?)
     }
-    /// Res
+
+    /// Retrieves a paged response of vault accounts based on the provided filters.
+    ///
+    /// # Arguments
+    ///
+    /// * `filters` - Query filters for vault accounts.
     ///
     /// # Errors
-    /// This function fails if ...
-    pub async fn create_vault(&self, params: CreateVault) -> Result<VaultAccount> {
+    ///
+    /// This function can fail if:
+    ///
+    /// * The POST request fails.
+    /// * Failed to serialize the query filters.
+    /// * Failed to deserialize the paged response.
+    ///
+    /// # Returns
+    ///
+    /// Paged response of vault accounts.
+    pub async fn vaults(&self, filters: QueryVaultAccounts) -> Result<VaultAccountsPagedResponse> {
+        let endpoint = "/v1/vault/accounts_paged";
+        self.send(endpoint, filters).await
+    }
+
+    /// Creates a new vault account with the provided details.
+    ///
+    /// # Arguments
+    ///
+    /// * `body` - Request body for creating a vault account.
+    ///
+    /// # Errors
+    ///
+    /// This function can fail if:
+    ///
+    /// * The POST request fails.
+    /// * Failed to serialize the request body.
+    /// * Failed to deserialize the created vault account details.
+    ///
+    /// # Returns
+    ///
+    /// Created vault account details.
+    pub async fn create_vault(&self, body: CreateVault) -> Result<VaultAccount> {
         let endpoint = "/v1/vault/accounts".to_string();
-        let url = self.base_url.join(&endpoint)?;
-
-        let mut req = self.http.post(url).json(&params);
-        req = self.authenticate(req, endpoint, params)?;
-
-        let response = req.send().await?.text().await?;
-
-        info!("{:?}", response);
-
-        Ok(serde_json::from_str(&response)?)
+        self.send(&endpoint, body).await
     }
-    /// Res
+
+    /// Creates a new wallet within a vault account for the specified asset.
+    ///
+    /// # Arguments
+    ///
+    /// * `vault_account_id` - ID of the vault account.
+    /// * `asset_id` - ID of the asset.
+    /// * `body` - Request body for creating a vault wallet.
     ///
     /// # Errors
-    /// This function fails if ...
+    ///
+    /// This function can fail if:
+    ///
+    /// * The POST request fails.
+    /// * Failed to serialize the request body.
+    /// * Failed to deserialize the created vault wallet details.
+    ///
+    /// # Returns
+    ///
+    /// Created vault wallet details.
     pub async fn create_vault_wallet(
         &self,
         vault_account_id: String,
@@ -179,113 +405,111 @@ impl Client {
         body: CreateVaultWallet,
     ) -> Result<CreateVaultAssetResponse> {
         let endpoint = format!("/v1/vault/accounts/{vault_account_id}/{asset_id}");
-        let url = self.base_url.join(&endpoint)?;
-
-        let mut req = self.http.post(url);
-        req = self.authenticate(req, endpoint, body)?;
-
-        let response = req.send().await?.text().await?;
-
-        info!("{:?}", response);
-
-        Ok(serde_json::from_str(&response)?)
+        self.send(&endpoint, body).await
     }
 
-    /// Res
+    /// Creates a new transaction with the provided details.
+    ///
+    /// # Arguments
+    ///
+    /// * `tx` - Request body for creating a transaction.
     ///
     /// # Errors
-    /// This function fails if ...
-    pub async fn vault_assets(&self) -> Result<Vec<VaultAsset>> {
-        let endpoint = "/v1/vault/assets".to_string();
-        let url = self.base_url.join(&endpoint)?;
-
-        let mut req = self.http.get(url);
-        req = self.authenticate(req, endpoint, ())?;
-
-        let response = req.send().await?.text().await?;
-
-        info!("{:?}", response);
-
-        Ok(serde_json::from_str(&response)?)
-    }
-
-    /// Res
     ///
-    /// # Errors
-    /// This function fails if ...
+    /// This function can fail if:
+    ///
+    /// * The POST request fails.
+    /// * Failed to serialize the request body.
+    /// * Failed to deserialize the created transaction details.
+    ///
+    /// # Returns
+    ///
+    /// Created transaction details.
     pub async fn create_transaction(
         &self,
         tx: CreateTransaction,
     ) -> Result<CreateTransactionResponse> {
         let endpoint = "/v1/transactions".to_string();
-        let url = self.base_url.join(&endpoint)?;
-
-        let mut req = self.http.post(url).json(&tx);
-        req = self.authenticate(req, endpoint, tx)?;
-
-        let response = req.send().await?.text().await?;
-
-        info!("{:?}", response);
-
-        Ok(serde_json::from_str(&response)?)
+        self.send(&endpoint, tx).await
     }
 
-    /// Res
+    /// Creates and signs a raw message transaction with the provided asset ID, vault ID, message content, and note.
+    ///
+    /// # Arguments
+    ///
+    /// * `asset_id` - ID of the asset.
+    /// * `vault_id` - ID of the vault.
+    /// * `message` - Message content as a byte array.
+    /// * `note` - Note for the transaction.
     ///
     /// # Errors
-    /// This function fails if ...
+    ///
+    /// This function can fail if:
+    ///
+    /// * The POST request fails.
+    /// * Failed to serialize the request body.
+    /// * Failed to deserialize the created transaction details.
+    ///
+    /// # Returns
+    ///
+    /// Created transaction details.
+    pub async fn sign_message(
+        &self,
+        asset_id: String,
+        vault_id: String,
+        message: Vec<u8>,
+        note: String,
+    ) -> Result<CreateTransactionResponse> {
+        let tx = CreateTransaction {
+            asset_id,
+            operation: TransactionOperation::RAW,
+            source: TransferPeerPath {
+                peer_type: "VAULT_ACCOUNT".to_string(),
+                id: vault_id,
+            },
+            destination: None,
+            destinations: None,
+            treat_as_gross_amount: None,
+            customer_ref_id: None,
+            amount: "0".to_string(),
+            extra_parameters: Some(ExtraParameters::RawMessageData(RawMessageData {
+                messages: vec![UnsignedMessage {
+                    content: hex::encode(&message),
+                }],
+            })),
+            note: Some(note),
+        };
+
+        let endpoint = "/v1/transactions".to_string();
+        self.send(&endpoint, tx).await
+    }
+
+    /// Creates a new wallet within a vault account for the specified asset.
+    ///
+    /// # Arguments
+    ///
+    /// * `vault_id` - ID of the vault account.
+    /// * `asset_id` - ID of the asset.
+    /// * `body` - Request body for creating a vault wallet.
+    ///
+    /// # Errors
+    ///
+    /// This function can fail if:
+    ///
+    /// * The POST request fails.
+    /// * Failed to serialize the request body.
+    /// * Failed to deserialize the created vault wallet details.
+    ///
+    /// # Returns
+    ///
+    /// Created vault wallet details.
     pub async fn create_wallet(
         &self,
         vault_id: String,
         asset_id: String,
-        params: CreateVaultWallet,
+        body: CreateVaultWallet,
     ) -> Result<CreateVaultAssetResponse> {
         let endpoint = format!("/v1/vault/accounts/{vault_id}/{asset_id}");
-        let url = self.base_url.join(&endpoint)?;
-
-        let mut req = self.http.post(url.clone()).json(&params);
-        req = self.authenticate(req, endpoint, params)?;
-
-        let response = req.send().await?.text().await?;
-
-        info!("{:?}", response);
-
-        Ok(serde_json::from_str(&response)?)
-    }
-
-    /// Res
-    ///
-    /// # Errors
-    /// This function fails if ...
-    pub async fn transactions(&self) -> Result<Vec<TransactionDetails>> {
-        let endpoint = "/v1/transactions".to_string();
-        let url = self.base_url.join(&endpoint)?;
-
-        let mut req = self.http.get(url);
-        req = self.authenticate(req, endpoint, ())?;
-
-        let response = req.send().await?.text().await?;
-
-        info!("{:?}", response);
-
-        Ok(serde_json::from_str(&response)?)
-    }
-
-    /// Res
-    ///
-    /// # Errors
-    /// This function fails if ...
-    pub async fn get_transaction(&self, txid: String) -> Result<TransactionDetails> {
-        let endpoint = format!("/v1/transactions/{txid}");
-        let url = self.base_url.join(&endpoint)?;
-
-        let mut req = self.http.get(url);
-        req = self.authenticate(req, endpoint, ())?;
-
-        let response = req.send().await?.text().await?;
-
-        info!("{:?}", response);
-
-        Ok(serde_json::from_str(&response)?)
+        self.send(&endpoint, body).await
     }
 }
