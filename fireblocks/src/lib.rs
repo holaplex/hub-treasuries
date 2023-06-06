@@ -16,7 +16,7 @@ pub mod objects;
 mod signer;
 
 use assets::Assets;
-pub use client::{Client, ClientError};
+pub use client::{Client, Error};
 
 #[derive(clap::Args, Clone, Debug)]
 pub struct FbArgs {
@@ -40,6 +40,9 @@ pub struct Fireblocks {
 }
 
 impl Fireblocks {
+    /// Creates a Fireblocks Client
+    /// # Errors
+    /// Returns an error if the client cannot be created
     pub fn new(args: FbArgs) -> Result<Self> {
         let client = Client::new(args.clone())?;
         let assets = Assets::new(args);
@@ -47,10 +50,12 @@ impl Fireblocks {
         Ok(Self { client, assets })
     }
 
+    #[must_use]
     pub fn assets(&self) -> &Assets {
         &self.assets
     }
 
+    #[must_use]
     pub fn client(&self) -> &Client {
         &self.client
     }
