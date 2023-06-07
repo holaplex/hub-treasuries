@@ -27,7 +27,11 @@ impl Solana {
 
     #[must_use]
     pub fn signer(&self, vault_id: String) -> TransactionSigner {
-        TransactionSigner::new(self.fireblocks.clone(), self.producer.clone(), vault_id)
+        TransactionSigner::new(
+            self.fireblocks.clone(),
+            self.producer.clone(),
+            Some(vault_id),
+        )
     }
 }
 
@@ -129,16 +133,13 @@ impl Sign<TxType, SolanaNftEventKey, SolanaTransaction, SolanaSignedTxn> for Tra
             tx_type, key.user_id, key.project_id
         );
 
+        let vault_id = self.vault_id.clone().context("vault id not set")?;
+
         let transaction = self
             .fireblocks
             .client()
             .create()
-            .raw_transaction(
-                "SOLANA",
-                self.vault_id.to_string(),
-                payload.serialized_message.clone(),
-                note,
-            )
+            .raw_transaction("SOLANA", vault_id, payload.serialized_message.clone(), note)
             .await?;
 
         let transaction_details = self

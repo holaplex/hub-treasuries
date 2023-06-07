@@ -31,14 +31,14 @@ pub trait Transactions<TxType, K, P, T>: Sign<TxType, K, P, T> + Events<K, T> {
 pub struct TransactionSigner {
     pub fireblocks: Fireblocks,
     pub producer: Producer<TreasuryEvents>,
-    pub vault_id: String,
+    pub vault_id: Option<String>,
 }
 
 impl TransactionSigner {
     pub fn new(
         fireblocks: Fireblocks,
         producer: Producer<TreasuryEvents>,
-        vault_id: String,
+        vault_id: Option<String>,
     ) -> Self {
         Self {
             fireblocks,

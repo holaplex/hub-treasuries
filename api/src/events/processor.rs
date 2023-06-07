@@ -55,12 +55,8 @@ impl Processor {
                 Some(_) | None => Ok(()),
             },
             Services::Polygon(key, e) => {
-                let conn = self.db.get();
-                let vault_id =
-                    Self::find_vault_id_by_project_id(conn, key.project_id.clone()).await?;
-
                 let polygon = self.polygon();
-                let signer = polygon.signer(vault_id);
+                let signer = polygon.signer();
 
                 #[allow(clippy::single_match)]
                 match e.event {
