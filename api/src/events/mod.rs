@@ -1,6 +1,6 @@
 pub mod customer;
-mod emitter;
 pub mod organization;
+pub mod polygon;
 mod processor;
 mod signer;
 pub mod solana;

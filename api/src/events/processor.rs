@@ -3,15 +3,16 @@ use hub_core::{prelude::*, producer::Producer, uuid::Uuid};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 
 use super::{
-    customer::CustomerEventHandler, organization::OrganizationEventHandler,
-    signer::TransactionSigner, solana::Solana,
+    customer::CustomerEventHandler, organization::OrganizationEventHandler, polygon::Polygon,
+    signer::Transactions, solana::Solana,
 };
 use crate::{
     db::Connection,
     entities::{project_treasuries, treasuries},
     proto::{
         customer_events::Event as CustomerEvent, organization_events::Event as OrganizationEvent,
-        solana_nft_events::Event as SolanaNftEvent, TreasuryEvents,
+        polygon_nft_events::Event as PolygonNftEvent, solana_nft_events::Event as SolanaNftEvent,
+        TreasuryEvents,
     },
     Services,
 };
@@ -53,73 +54,54 @@ impl Processor {
                 },
                 Some(_) | None => Ok(()),
             },
+            Services::Polygon(key, e) => {
+                let conn = self.db.get();
+                let vault_id =
+                    Self::find_vault_id_by_project_id(conn, key.project_id.clone()).await?;
+
+                let polygon = self.polygon();
+                let signer = polygon.signer(vault_id);
+
+                #[allow(clippy::single_match)]
+                match e.event {
+                    Some(PolygonNftEvent::SubmitCreateDropTxn(payload)) => {
+                        signer.create_drop(key.clone(), payload).await?;
+                    },
+
+                    None => (),
+                }
+                Ok(())
+            },
             Services::Solana(key, e) => {
                 let conn = self.db.get();
                 let vault_id =
                     Self::find_vault_id_by_project_id(conn, key.project_id.clone()).await?;
                 let solana = self.solana();
                 let signer = solana.signer(vault_id);
-                let event_emitter = solana.event();
 
                 match e.event {
                     Some(SolanaNftEvent::SignCreateDrop(payload)) => {
-                        let signed_transaction = signer.create_drop(key.clone(), payload).await?;
-
-                        event_emitter
-                            .create_drop_signed(key.into(), signed_transaction)
-                            .await?;
-
-                        Ok(())
+                        signer.create_drop(key.clone(), payload).await?;
                     },
                     Some(SolanaNftEvent::SignUpdateDrop(payload)) => {
-                        let signed_transaction = signer.update_drop(key.clone(), payload).await?;
-
-                        event_emitter
-                            .update_drop_signed(key.into(), signed_transaction)
-                            .await?;
-                        Ok(())
+                        signer.update_drop(key.clone(), payload).await?;
                     },
                     Some(SolanaNftEvent::SignMintDrop(payload)) => {
-                        let signed_transaction = signer.mint_drop(key.clone(), payload).await?;
-
-                        event_emitter
-                            .mint_drop_signed(key.into(), signed_transaction)
-                            .await?;
-
-                        Ok(())
+                        signer.mint_drop(key.clone(), payload).await?;
                     },
                     Some(SolanaNftEvent::SignTransferAsset(payload)) => {
-                        let signed_transaction =
-                            signer.transfer_asset(key.clone(), payload).await?;
-
-                        event_emitter
-                            .transfer_asset_signed(key.into(), signed_transaction)
-                            .await?;
-
-                        Ok(())
+                        signer.transfer_asset(key.clone(), payload).await?;
                     },
                     Some(SolanaNftEvent::SignRetryCreateDrop(payload)) => {
-                        let signed_transaction =
-                            signer.retry_mint_drop(key.clone(), payload).await?;
-
-                        event_emitter
-                            .retry_create_drop_signed(key.into(), signed_transaction)
-                            .await?;
-
-                        Ok(())
+                        signer.retry_mint_drop(key.clone(), payload).await?;
                     },
                     Some(SolanaNftEvent::SignRetryMintDrop(payload)) => {
-                        let signed_transaction =
-                            signer.retry_mint_drop(key.clone(), payload).await?;
-
-                        event_emitter
-                            .retry_mint_drop_signed(key.into(), signed_transaction)
-                            .await?;
-
-                        Ok(())
+                        signer.retry_mint_drop(key.clone(), payload).await?;
                     },
-                    _ => Ok(()),
-                }
+                    _ => (),
+                };
+
+                Ok(())
             },
         }
     }
@@ -133,11 +115,11 @@ impl Processor {
     }
 
     fn solana(&self) -> Solana {
-        Solana::new(
-            self.fireblocks.clone(),
-            self.db.clone(),
-            self.producer.clone(),
-        )
+        Solana::new(self.fireblocks.clone(), self.producer.clone())
+    }
+
+    fn polygon(&self) -> Polygon {
+        Polygon::new(self.fireblocks.clone(), self.producer.clone())
     }
 
     async fn find_vault_id_by_project_id(
