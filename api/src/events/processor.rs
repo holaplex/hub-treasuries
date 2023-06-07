@@ -118,7 +118,7 @@ impl Processor {
 
                         Ok(())
                     },
-                    None => Ok(()),
+                    _ => Ok(()),
                 }
             },
         }

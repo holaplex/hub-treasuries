@@ -10,7 +10,7 @@ use crate::{
     entities::sea_orm_active_enums::TxType,
     proto::{
         treasury_events::{
-            signed_transaction::Transaction, SignedTransaction, SolanaSignedTransaction,
+            SignedTransaction,
         },
         SolanaNftEventKey, SolanaTransaction, TreasuryEvents,
     },
@@ -52,7 +52,7 @@ impl TransactionSigner<SolanaNftEventKey, SolanaTransaction> for Signer {
         key: SolanaNftEventKey,
         payload: SolanaTransaction,
     ) -> Result<SignedTransaction> {
-        sign_transaction(self, TxType::CreateDrop, key, payload).await
+        self.sign_transaction(TxType::CreateDrop, key, payload).await
     }
 
     async fn update_drop(
@@ -60,7 +60,7 @@ impl TransactionSigner<SolanaNftEventKey, SolanaTransaction> for Signer {
         key: SolanaNftEventKey,
         payload: SolanaTransaction,
     ) -> Result<SignedTransaction> {
-        sign_transaction(self, TxType::UpdateMetadata, key, payload).await
+        self.sign_transaction(TxType::UpdateMetadata, key, payload).await
     }
 
     async fn mint_drop(
@@ -68,7 +68,7 @@ impl TransactionSigner<SolanaNftEventKey, SolanaTransaction> for Signer {
         key: SolanaNftEventKey,
         payload: SolanaTransaction,
     ) -> Result<SignedTransaction> {
-        sign_transaction(self, TxType::MintEdition, key, payload).await
+        self.sign_transaction(TxType::MintEdition, key, payload).await
     }
 
     async fn transfer_asset(
@@ -76,7 +76,7 @@ impl TransactionSigner<SolanaNftEventKey, SolanaTransaction> for Signer {
         key: SolanaNftEventKey,
         payload: SolanaTransaction,
     ) -> Result<SignedTransaction> {
-        sign_transaction(self, TxType::TransferMint, key, payload).await
+        self.sign_transaction(TxType::TransferMint, key, payload).await
     }
 
     async fn retry_create_drop(
@@ -84,7 +84,7 @@ impl TransactionSigner<SolanaNftEventKey, SolanaTransaction> for Signer {
         key: SolanaNftEventKey,
         payload: SolanaTransaction,
     ) -> Result<SignedTransaction> {
-        sign_transaction(self, TxType::CreateDrop, key, payload).await
+        self.sign_transaction(TxType::CreateDrop, key, payload).await
     }
 
     async fn retry_mint_drop(
@@ -92,34 +92,7 @@ impl TransactionSigner<SolanaNftEventKey, SolanaTransaction> for Signer {
         key: SolanaNftEventKey,
         payload: SolanaTransaction,
     ) -> Result<SignedTransaction> {
-        sign_transaction(self, TxType::MintEdition, key, payload).await
+        self.sign_transaction(TxType::MintEdition, key, payload).await
     }
 }
 
-async fn sign_transaction(
-    signer: &Signer,
-    tx_type: TxType,
-    key: SolanaNftEventKey,
-    mut payload: SolanaTransaction,
-) -> Result<SignedTransaction> {
-    let note = format!(
-        "{:?} by {:?} for project {:?}",
-        tx_type, key.user_id, key.project_id
-    );
-
-    let signature = signer
-        .sign_message(note, payload.serialized_message.clone())
-        .await?;
-
-    payload
-        .signed_message_signatures
-        .push(bs58::encode(signature).into_string());
-
-    Ok(SignedTransaction {
-        transaction: Some(Transaction::Solana(SolanaSignedTransaction {
-            serialized_message: payload.serialized_message,
-            signed_message_signatures: payload.signed_message_signatures,
-            project_id: key.project_id,
-        })),
-    })
-}
