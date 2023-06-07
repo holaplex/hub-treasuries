@@ -25,8 +25,8 @@ impl Polygon {
     }
 
     #[must_use]
-    pub fn signer(&self, vault_id: String) -> TransactionSigner {
-        TransactionSigner::new(self.fireblocks.clone(), self.producer.clone(), vault_id)
+    pub fn signer(&self) -> TransactionSigner {
+        TransactionSigner::new(self.fireblocks.clone(), self.producer.clone(), None)
     }
 }
 
@@ -101,8 +101,6 @@ impl Sign<TxType, PolygonNftEventKey, PolygonTransaction, PolygonTxnResult> for 
             "{:?} by {:?} for project {:?}",
             tx_type, key.user_id, key.project_id
         );
-
-        debug!("Submitting Polygon transaction: {:?}", note);
         let vault = self.fireblocks.treasury_vault();
 
         let transaction = self
