@@ -20,6 +20,7 @@ impl Emitter {
         key: TreasuryEventKey,
         signed_transaction: SignedTransaction,
     ) -> Result<()> {
+        info!("{:?} create_drop_signed", signed_transaction);
         let event = TreasuryEvents {
             event: Some(Event::MessageSigned(SignedTransactionEvent {
                 event: Some(signed_transaction_event::Event::CreateDrop(
@@ -125,10 +126,7 @@ impl Emitter {
 }
 
 impl From<SolanaNftEventKey> for TreasuryEventKey {
-    fn from(key: SolanaNftEventKey) -> Self {
-        Self {
-            id: key.project_id,
-            user_id: key.user_id,
-        }
+    fn from(SolanaNftEventKey { id, user_id, project_id }: SolanaNftEventKey) -> Self {
+        Self { id, user_id, project_id: Some(project_id) }
     }
 }

@@ -117,9 +117,10 @@ impl OrganizationEventHandler for Processor {
             active_model.insert(conn).await?;
 
             let proto_blockchain_enum: proto::Blockchain = asset_type.into();
+            let project_id = project.id.to_string();
 
             let event = treasury_events::Event::ProjectWalletCreated(ProjectWallet {
-                project_id: project.id.to_string(),
+                project_id: project_id.clone(),
                 wallet_address: vault_asset.address,
                 blockchain: proto_blockchain_enum as i32,
             });
@@ -128,6 +129,7 @@ impl OrganizationEventHandler for Processor {
             let key = TreasuryEventKey {
                 id: treasury.id.to_string(),
                 user_id: user_id.to_string(),
+                project_id: Some(project_id)
             };
 
             self.producer.send(Some(&event), Some(&key)).await?;

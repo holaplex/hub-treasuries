@@ -98,11 +98,12 @@ impl Mutation {
             .await?;
 
         let wallet = update_wallet_address(db, vault_asset.address, deduction_id).await?;
+        let project_id = customer_treasury.project_id.to_string();
 
         let event = TreasuryEvents {
             event: Some(treasury_events::Event::CustomerWalletCreated(
                 treasury_events::CustomerWallet {
-                    project_id: customer_treasury.project_id.to_string(),
+                    project_id: project_id.clone(),
                     customer_id: customer_treasury.customer_id.to_string(),
                     blockchain: asset_type.into(),
                 },
@@ -111,6 +112,7 @@ impl Mutation {
         let key = TreasuryEventKey {
             id: treasury.id.to_string(),
             user_id: user_id.to_string(),
+            project_id: Some(project_id),
         };
 
         producer.send(Some(&event), Some(&key)).await?;

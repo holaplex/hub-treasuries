@@ -7,8 +7,13 @@ use sea_orm::{
 
 use crate::{
     db::Connection,
-    entities::{treasuries, wallets},
-    proto::treasury_events::SignedTransaction,
+    entities::{sea_orm_active_enums::TxType, treasuries, wallets},
+    proto::{
+        treasury_events::{
+            signed_transaction::Transaction, SignedTransaction, SolanaSignedTransaction,
+        },
+        SolanaNftEventKey, SolanaTransaction,
+    },
 };
 
 #[async_trait]
@@ -52,7 +57,7 @@ impl Signer {
             .context("wallet not found")
     }
 
-    pub async fn sign_message(
+    async fn sign_message(
         &self,
         note: String,
         serialized_message: Vec<u8>,
@@ -90,5 +95,32 @@ impl Signer {
         let signature_decoded = <[u8; 64]>::from_hex(full_sig)?;
 
         Ok(signature_decoded)
+    }
+
+    pub async fn sign_transaction(
+        &self,
+        tx_type: TxType,
+        key: SolanaNftEventKey,
+        mut payload: SolanaTransaction,
+    ) -> Result<SignedTransaction> {
+        let note = format!(
+            "{:?} by {:?} for project {:?}",
+            tx_type, key.user_id, key.project_id
+        );
+
+        let signature = self
+            .sign_message(note, payload.serialized_message.clone())
+            .await?;
+
+        payload
+            .signed_message_signatures
+            .push(bs58::encode(signature).into_string());
+
+        Ok(SignedTransaction {
+            transaction: Some(Transaction::Solana(SolanaSignedTransaction {
+                serialized_message: payload.serialized_message,
+                signed_message_signatures: payload.signed_message_signatures,
+            })),
+        })
     }
 }
