@@ -5,6 +5,7 @@ use hub_core::{
     serde_json::{self},
     thiserror,
     tokio::time,
+    tracing::info,
 };
 use jsonwebtoken::EncodingKey;
 use reqwest::{Client as HttpClient, RequestBuilder, Url};
@@ -13,9 +14,9 @@ use serde::Serialize;
 use crate::{
     objects::{
         transaction::{
-            CreateTransaction, CreateTransactionResponse, ExtraParameters, RawMessageData,
-            TransactionDetails, TransactionOperation, TransactionStatus, TransferPeerPath,
-            UnsignedMessage,
+            CreateTransaction, CreateTransactionResponse, DestinationTransferPeerPath,
+            ExtraParameters, RawMessageData, TransactionDetails, TransactionOperation,
+            TransactionStatus, TransferPeerPath, UnsignedMessage,
         },
         vault::{
             CreateVault, CreateVaultAssetResponse, CreateVaultWallet, QueryVaultAccounts,
@@ -34,6 +35,7 @@ pub struct Client {
     request_signer: RequestSigner,
     base_url: Url,
     api_key: String,
+    contract_wallet_id: String,
 }
 
 #[derive(Debug, Clone, Copy, thiserror::Error)]
@@ -61,6 +63,7 @@ impl Client {
             fireblocks_endpoint,
             fireblocks_api_key,
             fireblocks_secret_path,
+            fireblocks_whitelisted_contract_wallet_id,
             ..
         } = args;
 
@@ -76,6 +79,7 @@ impl Client {
             request_signer: RequestSigner::new(encoding_key, fireblocks_api_key.clone()),
             base_url,
             api_key: fireblocks_api_key,
+            contract_wallet_id: fireblocks_whitelisted_contract_wallet_id,
         })
     }
 
@@ -354,6 +358,8 @@ impl CreateRequestBuilder {
 
         let response = req.send().await?.text().await?;
 
+        info!("Response: {}", response);
+
         Ok(serde_json::from_str(&response)?)
     }
 
@@ -481,6 +487,38 @@ impl CreateRequestBuilder {
         self.send(&endpoint, tx).await
     }
 
+    pub async fn contract_call(
+        &self,
+        data: Vec<u8>,
+        asset_id: String,
+        vault_id: String,
+        note: String,
+    ) -> Result<CreateTransactionResponse> {
+        let contract = &self.0.contract_wallet_id;
+
+        let tx = CreateTransaction {
+            asset_id,
+            operation: TransactionOperation::CONTRACT_CALL,
+            source: TransferPeerPath {
+                peer_type: "VAULT_ACCOUNT".to_string(),
+                id: vault_id,
+            },
+            destination: Some(DestinationTransferPeerPath {
+                peer_type: "EXTERNAL_WALLET".into(),
+                id: Some(contract.into()),
+                one_time_address: None,
+            }),
+            destinations: None,
+            treat_as_gross_amount: None,
+            customer_ref_id: None,
+            amount: "0".to_string(),
+            extra_parameters: Some(ExtraParameters::ContractCallData(hex::encode(data))),
+            note: Some(note),
+        };
+
+        let endpoint = "/v1/transactions".to_string();
+        self.send(&endpoint, tx).await
+    }
     /// Creates a new wallet within a vault account for the specified asset.
     ///
     /// # Arguments
