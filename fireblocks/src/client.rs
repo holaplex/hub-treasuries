@@ -36,7 +36,6 @@ pub struct Client {
     base_url: Url,
     api_key: String,
     contract_wallet_id: String,
-    test_mode: bool,
 }
 
 #[derive(Debug, Clone, Copy, thiserror::Error)]
@@ -65,7 +64,6 @@ impl Client {
             fireblocks_api_key,
             fireblocks_secret_path,
             fireblocks_whitelisted_contract_wallet_id,
-            fireblocks_test_mode,
             ..
         } = args;
 
@@ -82,7 +80,6 @@ impl Client {
             base_url,
             api_key: fireblocks_api_key,
             contract_wallet_id: fireblocks_whitelisted_contract_wallet_id,
-            test_mode: fireblocks_test_mode,
         })
     }
 
@@ -141,15 +138,6 @@ impl Client {
     #[must_use]
     pub fn create(&self) -> CreateRequestBuilder {
         CreateRequestBuilder(self.clone())
-    }
-
-    #[must_use]
-    pub fn asset_id(&self, id: &str) -> String {
-        match (self.test_mode, id) {
-            (true, "MATIC") => "MATIC_POLYGON_MUMBAI".to_string(),
-            (true, _) => format!("{}_TEST", id),
-            (false, _) => id.to_string(),
-        }
     }
 
     /// Waits for a transaction to reach the "COMPLETED" status by periodically checking the transaction details.
@@ -470,13 +458,11 @@ impl CreateRequestBuilder {
     /// Created transaction details.
     pub async fn raw_transaction(
         &self,
-        asset_id: &str,
+        asset_id: String,
         vault_id: String,
         message: Vec<u8>,
         note: String,
     ) -> Result<CreateTransactionResponse> {
-        let asset_id = self.0.asset_id(asset_id);
-
         let tx = CreateTransaction {
             asset_id,
             operation: TransactionOperation::RAW,
@@ -504,12 +490,11 @@ impl CreateRequestBuilder {
     pub async fn contract_call(
         &self,
         data: Vec<u8>,
-        asset_id: &str,
+        asset_id: String,
         vault_id: String,
         note: String,
     ) -> Result<CreateTransactionResponse> {
         let contract = &self.0.contract_wallet_id;
-        let asset_id = self.0.asset_id(asset_id);
 
         let tx = CreateTransaction {
             asset_id,

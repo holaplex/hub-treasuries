@@ -31,9 +31,7 @@ impl Polygon {
 }
 
 #[async_trait]
-impl Transactions<TxType, PolygonNftEventKey, PolygonTransaction, PolygonTxnResult>
-    for TransactionSigner
-{
+impl Transactions<PolygonNftEventKey, PolygonTransaction, PolygonTxnResult> for TransactionSigner {
     async fn create_drop(
         &self,
         key: PolygonNftEventKey,
@@ -90,7 +88,7 @@ impl Transactions<TxType, PolygonNftEventKey, PolygonTransaction, PolygonTxnResu
 }
 
 #[async_trait]
-impl Sign<TxType, PolygonNftEventKey, PolygonTransaction, PolygonTxnResult> for TransactionSigner {
+impl Sign<PolygonNftEventKey, PolygonTransaction, PolygonTxnResult> for TransactionSigner {
     async fn send_transaction(
         &self,
         tx_type: TxType,
@@ -102,12 +100,13 @@ impl Sign<TxType, PolygonNftEventKey, PolygonTransaction, PolygonTxnResult> for 
             tx_type, key.user_id, key.project_id
         );
         let vault = self.fireblocks.treasury_vault();
+        let asset_id = self.fireblocks.assets().id("MATIC");
 
         let transaction = self
             .fireblocks
             .client()
             .create()
-            .contract_call(payload.data, "MATIC", vault, note)
+            .contract_call(payload.data, asset_id, vault, note)
             .await?;
 
         debug!("transaction {:?}", transaction);
