@@ -1,10 +1,10 @@
 use fireblocks::Fireblocks;
 use hub_core::{prelude::*, producer::Producer};
 
-use crate::proto::TreasuryEvents;
+use crate::{entities::sea_orm_active_enums::TxType, proto::TreasuryEvents};
 
 #[async_trait]
-pub trait Sign<TxType, K, P, T> {
+pub trait Sign<K, P, T> {
     async fn send_transaction(&self, tx_type: TxType, key: K, payload: P) -> Result<T>;
 }
 
@@ -19,7 +19,7 @@ pub trait Events<K, T> {
 }
 
 #[async_trait]
-pub trait Transactions<TxType, K, P, T>: Sign<TxType, K, P, T> + Events<K, T> {
+pub trait Transactions<K, P, T>: Sign<K, P, T> + Events<K, T> {
     async fn create_drop(&self, key: K, payload: P) -> Result<T>;
     async fn mint_drop(&self, key: K, payload: P) -> Result<T>;
     async fn update_drop(&self, key: K, payload: P) -> Result<T>;

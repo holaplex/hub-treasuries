@@ -36,9 +36,7 @@ impl Solana {
 }
 
 #[async_trait]
-impl Transactions<TxType, SolanaNftEventKey, SolanaTransaction, SolanaSignedTxn>
-    for TransactionSigner
-{
+impl Transactions<SolanaNftEventKey, SolanaTransaction, SolanaSignedTxn> for TransactionSigner {
     async fn create_drop(
         &self,
         key: SolanaNftEventKey,
@@ -121,7 +119,7 @@ impl Transactions<TxType, SolanaNftEventKey, SolanaTransaction, SolanaSignedTxn>
 }
 
 #[async_trait]
-impl Sign<TxType, SolanaNftEventKey, SolanaTransaction, SolanaSignedTxn> for TransactionSigner {
+impl Sign<SolanaNftEventKey, SolanaTransaction, SolanaSignedTxn> for TransactionSigner {
     async fn send_transaction(
         &self,
         tx_type: TxType,
@@ -134,12 +132,13 @@ impl Sign<TxType, SolanaNftEventKey, SolanaTransaction, SolanaSignedTxn> for Tra
         );
 
         let vault_id = self.vault_id.clone().context("vault id not set")?;
+        let asset_id = self.fireblocks.assets().id("SOL");
 
         let transaction = self
             .fireblocks
             .client()
             .create()
-            .raw_transaction("SOLANA", vault_id, payload.serialized_message.clone(), note)
+            .raw_transaction(asset_id, vault_id, payload.serialized_message.clone(), note)
             .await?;
 
         let transaction_details = self
@@ -165,7 +164,6 @@ impl Sign<TxType, SolanaNftEventKey, SolanaTransaction, SolanaSignedTxn> for Tra
         Ok(SolanaSignedTxn {
             serialized_message: payload.serialized_message,
             signed_message_signatures: payload.signed_message_signatures,
-            project_id: key.project_id,
         })
     }
 }
@@ -177,7 +175,6 @@ impl Events<SolanaNftEventKey, SolanaSignedTxn> for TransactionSigner {
             event: Some(Event::SolanaCreateDropSigned(SolanaSignedTxn {
                 serialized_message: tx.serialized_message,
                 signed_message_signatures: tx.signed_message_signatures,
-                project_id: key.project_id.clone(),
             })),
         };
 
@@ -191,7 +188,6 @@ impl Events<SolanaNftEventKey, SolanaSignedTxn> for TransactionSigner {
             event: Some(Event::SolanaMintDropSigned(SolanaSignedTxn {
                 serialized_message: tx.serialized_message,
                 signed_message_signatures: tx.signed_message_signatures,
-                project_id: key.project_id.clone(),
             })),
         };
 
@@ -209,7 +205,6 @@ impl Events<SolanaNftEventKey, SolanaSignedTxn> for TransactionSigner {
             event: Some(Event::SolanaRetryCreateDropSigned(SolanaSignedTxn {
                 serialized_message: tx.serialized_message,
                 signed_message_signatures: tx.signed_message_signatures,
-                project_id: key.project_id.clone(),
             })),
         };
 
@@ -223,7 +218,6 @@ impl Events<SolanaNftEventKey, SolanaSignedTxn> for TransactionSigner {
             event: Some(Event::SolanaRetryMintDropSigned(SolanaSignedTxn {
                 serialized_message: tx.serialized_message,
                 signed_message_signatures: tx.signed_message_signatures,
-                project_id: key.project_id.clone(),
             })),
         };
 
@@ -237,7 +231,6 @@ impl Events<SolanaNftEventKey, SolanaSignedTxn> for TransactionSigner {
             event: Some(Event::SolanaUpdateDropSigned(SolanaSignedTxn {
                 serialized_message: tx.serialized_message,
                 signed_message_signatures: tx.signed_message_signatures,
-                project_id: key.project_id.clone(),
             })),
         };
 
@@ -251,7 +244,6 @@ impl Events<SolanaNftEventKey, SolanaSignedTxn> for TransactionSigner {
             event: Some(Event::SolanaTransferAssetSigned(SolanaSignedTxn {
                 serialized_message: tx.serialized_message,
                 signed_message_signatures: tx.signed_message_signatures,
-                project_id: key.project_id.clone(),
             })),
         };
 

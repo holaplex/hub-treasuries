@@ -30,4 +30,13 @@ impl Assets {
     pub fn test_mode(&self) -> bool {
         self.test_mode
     }
+
+    #[must_use]
+    pub fn id(&self, id: &str) -> String {
+        match (self.test_mode, id) {
+            (true, "MATIC") => "MATIC_POLYGON_MUMBAI".to_string(),
+            (true, _) => format!("{id}_TEST"),
+            (false, _) => id.to_string(),
+        }
+    }
 }
