@@ -9,8 +9,7 @@ use crate::{
     db::Connection,
     proto::{
         customer_events::Event as CustomerEvent, organization_events::Event as OrganizationEvent,
-        polygon_nft_events::Event as PolygonNftEvent, solana_nft_events::Event as SolanaNftEvent,
-        TreasuryEvents,
+        solana_nft_events::Event as SolanaNftEvent, TreasuryEvents,
     },
     Services,
 };
@@ -52,19 +51,7 @@ impl Processor {
                 },
                 Some(_) | None => Ok(()),
             },
-            Services::Polygon(key, e) => {
-                let polygon = self.polygon();
-
-                #[allow(clippy::single_match)]
-                match e.event {
-                    Some(PolygonNftEvent::SubmitCreateDropTxn(payload)) => {
-                        polygon.create_drop(key.clone(), payload).await?;
-                    },
-
-                    None => (),
-                }
-                Ok(())
-            },
+            Services::Polygon(key, e) => self.polygon().process(key, e).await,
             Services::Solana(key, e) => {
                 let solana = self.solana();
 
@@ -112,6 +99,10 @@ impl Processor {
     }
 
     fn polygon(&self) -> Polygon {
-        Polygon::new(self.fireblocks.clone(), self.producer.clone())
+        Polygon::new(
+            self.fireblocks.clone(),
+            self.producer.clone(),
+            self.db.clone(),
+        )
     }
 }

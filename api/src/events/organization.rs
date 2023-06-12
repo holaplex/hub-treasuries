@@ -129,7 +129,7 @@ impl OrganizationEventHandler for Processor {
             let key = TreasuryEventKey {
                 id: treasury.id.to_string(),
                 user_id: user_id.to_string(),
-                project_id: Some(project_id),
+                project_id,
             };
 
             self.producer.send(Some(&event), Some(&key)).await?;
