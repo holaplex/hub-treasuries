@@ -1,6 +1,5 @@
 use fireblocks::Fireblocks;
-use hub_core::{prelude::*, producer::Producer, uuid::Uuid};
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use hub_core::{prelude::*, producer::Producer};
 
 use super::{
     customer::CustomerEventHandler, organization::OrganizationEventHandler, polygon::Polygon,
@@ -8,7 +7,6 @@ use super::{
 };
 use crate::{
     db::Connection,
-    entities::{project_treasuries, treasuries},
     proto::{
         customer_events::Event as CustomerEvent, organization_events::Event as OrganizationEvent,
         polygon_nft_events::Event as PolygonNftEvent, solana_nft_events::Event as SolanaNftEvent,
@@ -56,12 +54,11 @@ impl Processor {
             },
             Services::Polygon(key, e) => {
                 let polygon = self.polygon();
-                let signer = polygon.signer();
 
                 #[allow(clippy::single_match)]
                 match e.event {
                     Some(PolygonNftEvent::SubmitCreateDropTxn(payload)) => {
-                        signer.create_drop(key.clone(), payload).await?;
+                        polygon.create_drop(key.clone(), payload).await?;
                     },
 
                     None => (),
@@ -69,30 +66,26 @@ impl Processor {
                 Ok(())
             },
             Services::Solana(key, e) => {
-                let conn = self.db.get();
-                let vault_id =
-                    Self::find_vault_id_by_project_id(conn, key.project_id.clone()).await?;
                 let solana = self.solana();
-                let signer = solana.signer(vault_id);
 
                 match e.event {
-                    Some(SolanaNftEvent::SignCreateDrop(payload)) => {
-                        signer.create_drop(key.clone(), payload).await?;
+                    Some(SolanaNftEvent::CreateDropSigningRequested(payload)) => {
+                        solana.create_drop(key.clone(), payload).await?;
                     },
-                    Some(SolanaNftEvent::SignUpdateDrop(payload)) => {
-                        signer.update_drop(key.clone(), payload).await?;
+                    Some(SolanaNftEvent::UpdateDropSigningRequested(payload)) => {
+                        solana.update_drop(key.clone(), payload).await?;
                     },
-                    Some(SolanaNftEvent::SignMintDrop(payload)) => {
-                        signer.mint_drop(key.clone(), payload).await?;
+                    Some(SolanaNftEvent::MintDropSigningRequested(payload)) => {
+                        solana.mint_drop(key.clone(), payload).await?;
                     },
-                    Some(SolanaNftEvent::SignTransferAsset(payload)) => {
-                        signer.transfer_asset(key.clone(), payload).await?;
+                    Some(SolanaNftEvent::TransferAssetSigningRequested(payload)) => {
+                        solana.transfer_asset(key.clone(), payload).await?;
                     },
-                    Some(SolanaNftEvent::SignRetryCreateDrop(payload)) => {
-                        signer.retry_mint_drop(key.clone(), payload).await?;
+                    Some(SolanaNftEvent::RetryCreateDropSigningRequested(payload)) => {
+                        solana.retry_mint_drop(key.clone(), payload).await?;
                     },
-                    Some(SolanaNftEvent::SignRetryMintDrop(payload)) => {
-                        signer.retry_mint_drop(key.clone(), payload).await?;
+                    Some(SolanaNftEvent::RetryMintDropSigningRequested(payload)) => {
+                        solana.retry_mint_drop(key.clone(), payload).await?;
                     },
                     _ => (),
                 };
@@ -111,28 +104,14 @@ impl Processor {
     }
 
     fn solana(&self) -> Solana {
-        Solana::new(self.fireblocks.clone(), self.producer.clone())
+        Solana::new(
+            self.fireblocks.clone(),
+            self.producer.clone(),
+            self.db.clone(),
+        )
     }
 
     fn polygon(&self) -> Polygon {
         Polygon::new(self.fireblocks.clone(), self.producer.clone())
-    }
-
-    async fn find_vault_id_by_project_id(
-        db: &DatabaseConnection,
-        project: String,
-    ) -> Result<String> {
-        let project = Uuid::from_str(&project)?;
-
-        let (_, t) = project_treasuries::Entity::find()
-            .find_also_related(treasuries::Entity)
-            .filter(project_treasuries::Column::ProjectId.eq(project))
-            .one(db)
-            .await?
-            .context("treasury not found in database")?;
-
-        let t = t.ok_or(anyhow!("treasury not found"))?;
-
-        Ok(t.vault_id)
     }
 }
