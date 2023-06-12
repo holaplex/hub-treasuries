@@ -1,7 +1,6 @@
 use fireblocks::Fireblocks;
-use futures::future::{ready, try_join_all};
-use hex::FromHex;
-use hub_core::{anyhow::Error, prelude::*, producer::Producer};
+use futures::future::ready;
+use hub_core::{prelude::*, producer::Producer};
 use solana_sdk::pubkey::Pubkey;
 
 use super::signer::{Events, Sign, Transactions};
@@ -126,7 +125,10 @@ impl Sign<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTxn> for Sola
         &self,
         tx_type: TxType,
         key: SolanaNftEventKey,
-        payload: SolanaPendingTransaction,
+        SolanaPendingTransaction {
+            serialized_message,
+            signatures_or_signers_public_keys,
+        }: SolanaPendingTransaction,
     ) -> Result<SolanaSignedTxn> {
         let conn = self.db.get();
         let note = format!(
@@ -136,13 +138,13 @@ impl Sign<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTxn> for Sola
 
         let mut fireblocks_requests = Vec::new();
 
-        for req_sig in payload.signatures_or_signers_public_keys {
+        for req_sig in signatures_or_signers_public_keys {
             if Self::is_public_key(&req_sig) {
                 let vault_id = Self::find_vault_id_by_wallet_address(conn, req_sig).await?;
                 let fireblocks_request = Self::request_and_wait_signature_from_fireblocks(
                     &self.fireblocks,
                     note.clone(),
-                    payload.serialized_message.clone(),
+                    serialized_message.clone(),
                     vault_id,
                 );
 
@@ -152,11 +154,11 @@ impl Sign<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTxn> for Sola
             }
         }
 
-        let signatures = futures::future::try_join_all(fireblocks_requests).await?;
+        let signed_message_signatures = futures::future::try_join_all(fireblocks_requests).await?;
 
         Ok(SolanaSignedTxn {
-            serialized_message: payload.serialized_message,
-            signed_message_signatures: signatures,
+            serialized_message,
+            signed_message_signatures,
         })
     }
 }
@@ -165,10 +167,7 @@ impl Sign<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTxn> for Sola
 impl Events<SolanaNftEventKey, SolanaSignedTxn> for Solana {
     async fn on_create_drop(&self, key: SolanaNftEventKey, tx: SolanaSignedTxn) -> Result<()> {
         let event = TreasuryEvents {
-            event: Some(Event::SolanaCreateDropSigned(SolanaSignedTxn {
-                serialized_message: tx.serialized_message,
-                signed_message_signatures: tx.signed_message_signatures,
-            })),
+            event: Some(Event::SolanaCreateDropSigned(tx)),
         };
 
         self.producer.send(Some(&event), Some(&key.into())).await?;
@@ -178,10 +177,7 @@ impl Events<SolanaNftEventKey, SolanaSignedTxn> for Solana {
 
     async fn on_mint_drop(&self, key: SolanaNftEventKey, tx: SolanaSignedTxn) -> Result<()> {
         let event = TreasuryEvents {
-            event: Some(Event::SolanaMintDropSigned(SolanaSignedTxn {
-                serialized_message: tx.serialized_message,
-                signed_message_signatures: tx.signed_message_signatures,
-            })),
+            event: Some(Event::SolanaMintDropSigned(tx)),
         };
 
         self.producer.send(Some(&event), Some(&key.into())).await?;
@@ -195,10 +191,7 @@ impl Events<SolanaNftEventKey, SolanaSignedTxn> for Solana {
         tx: SolanaSignedTxn,
     ) -> Result<()> {
         let event = TreasuryEvents {
-            event: Some(Event::SolanaRetryCreateDropSigned(SolanaSignedTxn {
-                serialized_message: tx.serialized_message,
-                signed_message_signatures: tx.signed_message_signatures,
-            })),
+            event: Some(Event::SolanaRetryCreateDropSigned(tx)),
         };
 
         self.producer.send(Some(&event), Some(&key.into())).await?;
@@ -208,10 +201,7 @@ impl Events<SolanaNftEventKey, SolanaSignedTxn> for Solana {
 
     async fn on_retry_mint_drop(&self, key: SolanaNftEventKey, tx: SolanaSignedTxn) -> Result<()> {
         let event = TreasuryEvents {
-            event: Some(Event::SolanaRetryMintDropSigned(SolanaSignedTxn {
-                serialized_message: tx.serialized_message,
-                signed_message_signatures: tx.signed_message_signatures,
-            })),
+            event: Some(Event::SolanaRetryMintDropSigned(tx)),
         };
 
         self.producer.send(Some(&event), Some(&key.into())).await?;
@@ -221,10 +211,7 @@ impl Events<SolanaNftEventKey, SolanaSignedTxn> for Solana {
 
     async fn on_update_drop(&self, key: SolanaNftEventKey, tx: SolanaSignedTxn) -> Result<()> {
         let event = TreasuryEvents {
-            event: Some(Event::SolanaUpdateDropSigned(SolanaSignedTxn {
-                serialized_message: tx.serialized_message,
-                signed_message_signatures: tx.signed_message_signatures,
-            })),
+            event: Some(Event::SolanaUpdateDropSigned(tx)),
         };
 
         self.producer.send(Some(&event), Some(&key.into())).await?;
@@ -234,10 +221,7 @@ impl Events<SolanaNftEventKey, SolanaSignedTxn> for Solana {
 
     async fn on_transfer_asset(&self, key: SolanaNftEventKey, tx: SolanaSignedTxn) -> Result<()> {
         let event = TreasuryEvents {
-            event: Some(Event::SolanaTransferAssetSigned(SolanaSignedTxn {
-                serialized_message: tx.serialized_message,
-                signed_message_signatures: tx.signed_message_signatures,
-            })),
+            event: Some(Event::SolanaTransferAssetSigned(tx)),
         };
 
         self.producer.send(Some(&event), Some(&key.into())).await?;
