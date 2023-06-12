@@ -92,7 +92,7 @@ impl CustomerEventHandler for Processor {
         let key = TreasuryEventKey {
             id: treasury.id.to_string(),
             user_id: key.id,
-            project_id: Some(project_id.to_string()),
+            project_id: project_id.to_string(),
         };
 
         self.producer.send(Some(&event), Some(&key)).await?;

@@ -1,5 +1,3 @@
-use fireblocks::Fireblocks;
-use hex::FromHex;
 use hub_core::prelude::*;
 use sea_orm::{prelude::*, DatabaseConnection, JoinType, QueryFilter, QuerySelect, RelationTrait};
 
@@ -10,58 +8,6 @@ pub trait Sign<K, P, T> {
     const ASSET_ID: &'static str;
 
     async fn send_transaction(&self, tx_type: TxType, key: K, payload: P) -> Result<T>;
-    async fn find_vault_id_by_wallet_address(
-        db: &DatabaseConnection,
-        wallet_address: String,
-    ) -> Result<String> {
-        let treasury = treasuries::Entity::find()
-            .join(JoinType::InnerJoin, treasuries::Relation::Wallets.def())
-            .filter(wallets::Column::Address.eq(wallet_address.clone()))
-            .one(db)
-            .await?
-            .ok_or(anyhow!(
-                "no treasury found for wallet address {}",
-                wallet_address
-            ))?;
-
-        Ok(treasury.vault_id)
-    }
-
-    async fn request_and_wait_signature_from_fireblocks(
-        fireblocks: &Fireblocks,
-        note: String,
-        message: Vec<u8>,
-        vault_id: String,
-    ) -> Result<String> {
-        let asset_id = fireblocks.assets().id(Self::ASSET_ID);
-
-        info!("asset_id {:?}", asset_id);
-
-        let transaction = fireblocks
-            .client()
-            .create()
-            .raw_transaction(asset_id, vault_id, message, note)
-            .await?;
-
-        let transaction_details = fireblocks
-            .client()
-            .wait_on_transaction_completion(transaction.id)
-            .await?;
-
-        let full_sig = transaction_details
-            .signed_messages
-            .get(0)
-            .context("failed to get signed message response")?
-            .clone()
-            .signature
-            .full_sig;
-
-        let signature = <[u8; 64]>::from_hex(full_sig)?;
-
-        let signature = bs58::encode(signature).into_string();
-
-        Ok(signature)
-    }
 }
 
 #[async_trait]
@@ -82,4 +28,21 @@ pub trait Transactions<K, P, T>: Sign<K, P, T> + Events<K, T> {
     async fn transfer_asset(&self, key: K, payload: P) -> Result<T>;
     async fn retry_create_drop(&self, key: K, payload: P) -> Result<T>;
     async fn retry_mint_drop(&self, key: K, payload: P) -> Result<T>;
+}
+
+pub(crate) async fn find_vault_id_by_wallet_address(
+    db: &DatabaseConnection,
+    wallet_address: String,
+) -> Result<String> {
+    let treasury = treasuries::Entity::find()
+        .join(JoinType::InnerJoin, treasuries::Relation::Wallets.def())
+        .filter(wallets::Column::Address.eq(wallet_address.clone()))
+        .one(db)
+        .await?
+        .ok_or(anyhow!(
+            "no treasury found for wallet address {}",
+            wallet_address
+        ))?;
+
+    Ok(treasury.vault_id)
 }
