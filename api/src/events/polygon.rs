@@ -293,41 +293,71 @@ impl Events<PolygonNftEventKey, PolygonTransactionResult> for Polygon {
 
     async fn on_mint_drop(
         &self,
-        _key: PolygonNftEventKey,
-        _tx: PolygonTransactionResult,
+        key: PolygonNftEventKey,
+        tx: PolygonTransactionResult,
     ) -> Result<()> {
+        let event = TreasuryEvents {
+            event: Some(Event::PolygonMintDropSubmitted(tx)),
+        };
+
+        self.producer.send(Some(&event), Some(&key.into())).await?;
+
         Ok(())
     }
 
     async fn on_retry_create_drop(
         &self,
-        _key: PolygonNftEventKey,
-        _tx: PolygonTransactionResult,
+        key: PolygonNftEventKey,
+        tx: PolygonTransactionResult,
     ) -> Result<()> {
+        let event = TreasuryEvents {
+            event: Some(Event::PolygonRetryCreateDropSubmitted(tx)),
+        };
+
+        self.producer.send(Some(&event), Some(&key.into())).await?;
+
         Ok(())
     }
 
     async fn on_retry_mint_drop(
         &self,
-        _key: PolygonNftEventKey,
-        _tx: PolygonTransactionResult,
+        key: PolygonNftEventKey,
+        tx: PolygonTransactionResult,
     ) -> Result<()> {
+        let event = TreasuryEvents {
+            event: Some(Event::PolygonRetryMintDropSubmitted(tx)),
+        };
+
+        self.producer.send(Some(&event), Some(&key.into())).await?;
+
         Ok(())
     }
 
     async fn on_update_drop(
         &self,
-        _key: PolygonNftEventKey,
-        _tx: PolygonTransactionResult,
+        key: PolygonNftEventKey,
+        tx: PolygonTransactionResult,
     ) -> Result<()> {
+        let event = TreasuryEvents {
+            event: Some(Event::PolygonUpdateDropSubmitted(tx)),
+        };
+
+        self.producer.send(Some(&event), Some(&key.into())).await?;
+
         Ok(())
     }
 
     async fn on_transfer_asset(
         &self,
-        _key: PolygonNftEventKey,
-        _tx: PolygonTransactionResult,
+        key: PolygonNftEventKey,
+        tx: PolygonTransactionResult,
     ) -> Result<()> {
+        let event = TreasuryEvents {
+            event: Some(Event::PolygonTransferAssetSubmitted(tx)),
+        };
+
+        self.producer.send(Some(&event), Some(&key.into())).await?;
+
         Ok(())
     }
 }
