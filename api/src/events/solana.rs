@@ -1,7 +1,8 @@
 use fireblocks::Fireblocks;
-use futures::future::try_join_all;
+use futures::future::{ready, try_join_all};
 use hex::FromHex;
 use hub_core::{anyhow::Error, prelude::*, producer::Producer};
+use solana_sdk::pubkey::Pubkey;
 
 use super::signer::{Events, Sign, Transactions};
 use crate::{
@@ -27,6 +28,10 @@ impl Solana {
             producer,
             db,
         }
+    }
+
+    pub fn is_public_key(test_case: &str) -> bool {
+        Pubkey::from_str(test_case).is_ok()
     }
 }
 
@@ -115,11 +120,13 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTxn> 
 
 #[async_trait]
 impl Sign<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTxn> for Solana {
+    const ASSET_ID: &'static str = "SOL";
+
     async fn send_transaction(
         &self,
         tx_type: TxType,
         key: SolanaNftEventKey,
-        mut payload: SolanaPendingTransaction,
+        payload: SolanaPendingTransaction,
     ) -> Result<SolanaSignedTxn> {
         let conn = self.db.get();
         let note = format!(
@@ -127,64 +134,29 @@ impl Sign<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTxn> for Sola
             tx_type, key.user_id, key.project_id,
         );
 
-        info!("looking up vault ids for {:?}", payload.request_signatures.clone());
-        let vault_ids =
-            Self::find_vault_ids_by_wallet_address(conn, payload.request_signatures.clone()).await?;
+        let mut fireblocks_requests = Vec::new();
 
-        info!("vault ids {:?}", vault_ids.clone());
-        let asset_id = self.fireblocks.assets().id("SOL");
-        let create_client = self.fireblocks.client().create();
+        for req_sig in payload.signatures_or_signers_public_keys {
+            if Self::is_public_key(&req_sig) {
+                let vault_id = Self::find_vault_id_by_wallet_address(conn, req_sig).await?;
+                let fireblocks_request = Self::request_and_wait_signature_from_fireblocks(
+                    &self.fireblocks,
+                    note.clone(),
+                    payload.serialized_message.clone(),
+                    vault_id,
+                );
 
-        let transactions = vault_ids.into_iter().map(|vault_id| {
-            let asset_id = asset_id.clone();
-            let note = note.clone();
-            let message = payload.serialized_message.clone();
-
-            info!("sending transaction to fireblocks {vault_id}");
-            create_client.raw_transaction(asset_id, vault_id, message, note)
-        });
-        let transactions = try_join_all(transactions).await?;
-
-        let transaction_details = transactions.into_iter().map(|transaction| {
-            info!("waiting on transaction {:?}", transaction);
-
-            self.fireblocks
-                .client()
-                .wait_on_transaction_completion(transaction.id)
-        });
-
-        let transaction_details = try_join_all(transaction_details).await?;
-
-        let signatures = transaction_details
-            .iter()
-            .map(|transaction_detail| {
-                info!("getting signature for transaction {:?}", transaction_detail);
-
-                let full_sig = transaction_detail
-                    .signed_messages
-                    .get(0)
-                    .context("failed to get signed message response")?
-                    .clone()
-                    .signature
-                    .full_sig;
-
-                let signature = <[u8; 64]>::from_hex(full_sig)?;
-
-                let signature = bs58::encode(signature).into_string();
-
-                Ok(signature)
-            })
-            .collect::<Result<Vec<String>, Error>>()?;
-
-        for signature in signatures {
-            payload.signed_message_signatures.push(signature);
+                fireblocks_requests.push(fireblocks_request);
+            } else {
+                fireblocks_requests.push(Box::pin(ready(Ok(req_sig))));
+            }
         }
 
-        info!("transaction signed successfully {:?}", payload);
+        let signatures = futures::future::try_join_all(fireblocks_requests).await?;
 
         Ok(SolanaSignedTxn {
             serialized_message: payload.serialized_message,
-            signed_message_signatures: payload.signed_message_signatures,
+            signed_message_signatures: signatures,
         })
     }
 }

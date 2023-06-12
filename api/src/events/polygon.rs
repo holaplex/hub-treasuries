@@ -84,6 +84,8 @@ impl Transactions<PolygonNftEventKey, PolygonTransaction, PolygonTxnResult> for 
 
 #[async_trait]
 impl Sign<PolygonNftEventKey, PolygonTransaction, PolygonTxnResult> for Polygon {
+    const ASSET_ID: &'static str = "MATIC";
+
     async fn send_transaction(
         &self,
         tx_type: TxType,
@@ -95,7 +97,7 @@ impl Sign<PolygonNftEventKey, PolygonTransaction, PolygonTxnResult> for Polygon 
             tx_type, key.user_id, key.project_id
         );
         let vault = self.fireblocks.treasury_vault();
-        let asset_id = self.fireblocks.assets().id("MATIC");
+        let asset_id = self.fireblocks.assets().id(Self::ASSET_ID);
 
         let transaction = self
             .fireblocks
