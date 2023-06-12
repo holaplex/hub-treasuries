@@ -46,7 +46,7 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/customer.proto.rs"));
     include!(concat!(env!("OUT_DIR"), "/nfts.proto.rs"));
     include!(concat!(env!("OUT_DIR"), "/solana_nfts.proto.rs"));
-    include!(concat!(env!("OUT_DIR"), "/polygon_nfts.rs"));
+    include!(concat!(env!("OUT_DIR"), "/polygon_nfts.proto.rs"));
     include!(concat!(env!("OUT_DIR"), "/treasury.proto.rs"));
 }
 

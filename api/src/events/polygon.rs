@@ -1,7 +1,7 @@
 use fireblocks::Fireblocks;
 use hub_core::{prelude::*, producer::Producer};
 
-use super::signer::{Events, Sign, TransactionSigner, Transactions};
+use super::signer::{Events, Sign, Transactions};
 use crate::{
     entities::sea_orm_active_enums::TxType,
     proto::{
@@ -23,15 +23,10 @@ impl Polygon {
             producer,
         }
     }
-
-    #[must_use]
-    pub fn signer(&self) -> TransactionSigner {
-        TransactionSigner::new(self.fireblocks.clone(), self.producer.clone(), None)
-    }
 }
 
 #[async_trait]
-impl Transactions<PolygonNftEventKey, PolygonTransaction, PolygonTxnResult> for TransactionSigner {
+impl Transactions<PolygonNftEventKey, PolygonTransaction, PolygonTxnResult> for Polygon {
     async fn create_drop(
         &self,
         key: PolygonNftEventKey,
@@ -88,7 +83,7 @@ impl Transactions<PolygonNftEventKey, PolygonTransaction, PolygonTxnResult> for 
 }
 
 #[async_trait]
-impl Sign<PolygonNftEventKey, PolygonTransaction, PolygonTxnResult> for TransactionSigner {
+impl Sign<PolygonNftEventKey, PolygonTransaction, PolygonTxnResult> for Polygon {
     async fn send_transaction(
         &self,
         tx_type: TxType,
@@ -131,7 +126,7 @@ impl Sign<PolygonNftEventKey, PolygonTransaction, PolygonTxnResult> for Transact
 }
 
 #[async_trait]
-impl Events<PolygonNftEventKey, PolygonTxnResult> for TransactionSigner {
+impl Events<PolygonNftEventKey, PolygonTxnResult> for Polygon {
     async fn on_create_drop(&self, key: PolygonNftEventKey, tx: PolygonTxnResult) -> Result<()> {
         let event = TreasuryEvents {
             event: Some(Event::PolygonCreateDropTxnSubmitted(tx)),

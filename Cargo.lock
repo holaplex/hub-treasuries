@@ -1424,6 +1424,7 @@ dependencies = [
  "bincode",
  "bs58",
  "fireblocks",
+ "futures",
  "hex",
  "holaplex-hub-core",
  "holaplex-hub-core-build",

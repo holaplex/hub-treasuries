@@ -1,11 +1,25 @@
-use fireblocks::Fireblocks;
-use hub_core::{prelude::*, producer::Producer};
+use hub_core::prelude::*;
+use sea_orm::{prelude::*, DatabaseConnection, JoinType, QueryFilter, QuerySelect, RelationTrait};
 
-use crate::{entities::sea_orm_active_enums::TxType, proto::TreasuryEvents};
+use crate::entities::{sea_orm_active_enums::TxType, treasuries, wallets};
 
 #[async_trait]
 pub trait Sign<K, P, T> {
     async fn send_transaction(&self, tx_type: TxType, key: K, payload: P) -> Result<T>;
+    async fn find_vault_ids_by_wallet_address(
+        db: &DatabaseConnection,
+        wallet_addresses: Vec<String>,
+    ) -> Result<Vec<String>> {
+        let treasuries = treasuries::Entity::find()
+            .join(JoinType::InnerJoin, treasuries::Relation::Wallets.def())
+            .filter(wallets::Column::Address.is_in(wallet_addresses))
+            .all(db)
+            .await?;
+
+        info!("found treasury vault ids: {:?}", treasuries);
+
+        Ok(treasuries.into_iter().map(|t| t.vault_id).collect())
+    }
 }
 
 #[async_trait]
@@ -26,24 +40,4 @@ pub trait Transactions<K, P, T>: Sign<K, P, T> + Events<K, T> {
     async fn transfer_asset(&self, key: K, payload: P) -> Result<T>;
     async fn retry_create_drop(&self, key: K, payload: P) -> Result<T>;
     async fn retry_mint_drop(&self, key: K, payload: P) -> Result<T>;
-}
-
-pub struct TransactionSigner {
-    pub fireblocks: Fireblocks,
-    pub producer: Producer<TreasuryEvents>,
-    pub vault_id: Option<String>,
-}
-
-impl TransactionSigner {
-    pub fn new(
-        fireblocks: Fireblocks,
-        producer: Producer<TreasuryEvents>,
-        vault_id: Option<String>,
-    ) -> Self {
-        Self {
-            fireblocks,
-            producer,
-            vault_id,
-        }
-    }
 }
