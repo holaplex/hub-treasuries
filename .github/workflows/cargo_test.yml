@@ -30,8 +30,6 @@ jobs:
         ports:
           - 5432:5432
 
-    steps:
-      - uses: actions/checkout@v3
       - name: Install dependencies
         run: |
           sudo apt-get update -y && \
@@ -41,8 +39,11 @@ jobs:
             libsasl2-dev \
             libssl-dev \
             libudev-dev \
-            pkg-config \
-            protobuf-compiler
+            pkg-config
+
+      - name: Get protoc from github releases
+        run: |
+          sudo ./ci/get-protoc.sh
 
       - name: Get protoc from github releases
         run: |
