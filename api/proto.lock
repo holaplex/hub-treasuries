@@ -5,8 +5,8 @@ sha512 = "d75800df0d4744c6b0f4d9a9952d3bfd0bb6b24a8babd19104cc11b54a525f85551b3c
 
 [[schemas]]
 subject = "nfts"
-version = 10
-sha512 = "67fadd3a6185229df033804be2e598b13ac6cbb0464e4e2c4e91caa85d116527170aafb92137741cf4d661b2e88c036fb42d0f761d73d9f82527e2781095f173"
+version = 12
+sha512 = "2a621c8558fca0e7cdb3d909e126dc09282b30fdeed29f9ca42828eb7e8db94ee6e612cbf15ec5f15e477089d4dbb9b69abc9000c6cbf977bb40917fdedc3585"
 
 [[schemas]]
 subject = "organization"
