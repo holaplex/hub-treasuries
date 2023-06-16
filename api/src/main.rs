@@ -35,7 +35,7 @@ pub fn main() {
             let fireblocks = fireblocks::Fireblocks::new(fireblocks)?;
             let producer = common.producer_cfg.build::<proto::TreasuryEvents>().await?;
 
-            let event_producer =
+            let event_processor =
                 events::Processor::new(connection.clone(), producer.clone(), fireblocks.clone());
 
             let credits = common.credits_cfg.build::<Actions>().await?;
@@ -53,13 +53,13 @@ pub fn main() {
                 {
                     let mut stream = cons.stream();
                     loop {
-                        let event_producer = event_producer.clone();
+                        let event_processor = event_processor.clone();
 
                         match stream.next().await {
                             Some(Ok(msg)) => {
                                 info!(?msg, "message received");
 
-                                tokio::spawn(async move { event_producer.process(msg).await });
+                                tokio::spawn(async move { event_processor.process(msg).await });
                                 task::yield_now().await;
                             },
                             None => (),

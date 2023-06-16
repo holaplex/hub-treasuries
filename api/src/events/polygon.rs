@@ -256,22 +256,23 @@ impl Sign<PolygonNftEventKey, PolygonTransaction, PolygonTransactionResult> for 
             .contract_call(payload.data, asset_id, vault, note)
             .await?;
 
-        let details = self
+        let transaction_result = self
             .fireblocks
             .client()
             .wait_on_transaction_completion(transaction.id)
-            .await;
+            .await
+            .map_or_else(
+                |_| PolygonTransactionResult {
+                    hash: None,
+                    status: TransactionStatus::Failed as i32,
+                },
+                |details| PolygonTransactionResult {
+                    hash: Some(details.tx_hash),
+                    status: details.status as i32,
+                },
+            );
 
-        Ok(match details {
-            Ok(details) => PolygonTransactionResult {
-                hash: details.tx_hash,
-                status: details.status as i32,
-            },
-            Err(_) => PolygonTransactionResult {
-                hash: String::new(),
-                status: TransactionStatus::Failed as i32,
-            },
-        })
+        Ok(transaction_result)
     }
 }
 

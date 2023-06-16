@@ -9,7 +9,7 @@ use crate::{
     db::Connection,
     entities::sea_orm_active_enums::TxType,
     proto::{
-        treasury_events::{Event, SolanaSignedTransaction},
+        treasury_events::{Event, SolanaTransactionResult, TransactionStatus},
         SolanaNftEventKey, SolanaPendingTransaction, TreasuryEventKey, TreasuryEvents,
     },
 };
@@ -71,12 +71,12 @@ impl Solana {
 }
 
 #[async_trait]
-impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTransaction> for Solana {
+impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaTransactionResult> for Solana {
     async fn create_drop(
         &self,
         key: SolanaNftEventKey,
         payload: SolanaPendingTransaction,
-    ) -> Result<SolanaSignedTransaction> {
+    ) -> Result<SolanaTransactionResult> {
         let tx = self
             .send_transaction(TxType::CreateDrop, key.clone(), payload)
             .await?;
@@ -90,7 +90,7 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTrans
         &self,
         key: SolanaNftEventKey,
         payload: SolanaPendingTransaction,
-    ) -> Result<SolanaSignedTransaction> {
+    ) -> Result<SolanaTransactionResult> {
         let tx = self
             .send_transaction(TxType::UpdateMetadata, key.clone(), payload)
             .await?;
@@ -104,7 +104,7 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTrans
         &self,
         key: SolanaNftEventKey,
         payload: SolanaPendingTransaction,
-    ) -> Result<SolanaSignedTransaction> {
+    ) -> Result<SolanaTransactionResult> {
         let tx = self
             .send_transaction(TxType::MintEdition, key.clone(), payload)
             .await?;
@@ -117,7 +117,7 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTrans
         &self,
         key: SolanaNftEventKey,
         payload: SolanaPendingTransaction,
-    ) -> Result<SolanaSignedTransaction> {
+    ) -> Result<SolanaTransactionResult> {
         let tx = self
             .send_transaction(TxType::TransferMint, key.clone(), payload)
             .await?;
@@ -130,7 +130,7 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTrans
         &self,
         key: SolanaNftEventKey,
         payload: SolanaPendingTransaction,
-    ) -> Result<SolanaSignedTransaction> {
+    ) -> Result<SolanaTransactionResult> {
         let tx = self
             .send_transaction(TxType::CreateDrop, key.clone(), payload)
             .await?;
@@ -143,7 +143,7 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTrans
         &self,
         key: SolanaNftEventKey,
         payload: SolanaPendingTransaction,
-    ) -> Result<SolanaSignedTransaction> {
+    ) -> Result<SolanaTransactionResult> {
         let tx = self
             .send_transaction(TxType::MintEdition, key.clone(), payload)
             .await?;
@@ -154,7 +154,7 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTrans
 }
 
 #[async_trait]
-impl Sign<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTransaction> for Solana {
+impl Sign<SolanaNftEventKey, SolanaPendingTransaction, SolanaTransactionResult> for Solana {
     const ASSET_ID: &'static str = "SOL";
 
     async fn send_transaction(
@@ -165,7 +165,7 @@ impl Sign<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTransaction> 
             serialized_message,
             signatures_or_signers_public_keys,
         }: SolanaPendingTransaction,
-    ) -> Result<SolanaSignedTransaction> {
+    ) -> Result<SolanaTransactionResult> {
         let conn = self.db.get();
         let note = format!(
             "{:?} by {:?} for project {:?}",
@@ -192,21 +192,31 @@ impl Sign<SolanaNftEventKey, SolanaPendingTransaction, SolanaSignedTransaction> 
             }
         }
 
-        let signed_message_signatures = futures::future::try_join_all(fireblocks_requests).await?;
+        let solana_transaction_result = futures::future::try_join_all(fireblocks_requests)
+            .await
+            .map_or_else(
+                |_| SolanaTransactionResult {
+                    serialized_message: None,
+                    signed_message_signatures: vec![],
+                    status: TransactionStatus::Failed.into(),
+                },
+                |signed_message_signatures| SolanaTransactionResult {
+                    serialized_message: Some(serialized_message),
+                    signed_message_signatures,
+                    status: TransactionStatus::Completed.into(),
+                },
+            );
 
-        Ok(SolanaSignedTransaction {
-            serialized_message,
-            signed_message_signatures,
-        })
+        Ok(solana_transaction_result)
     }
 }
 
 #[async_trait]
-impl Events<SolanaNftEventKey, SolanaSignedTransaction> for Solana {
+impl Events<SolanaNftEventKey, SolanaTransactionResult> for Solana {
     async fn on_create_drop(
         &self,
         key: SolanaNftEventKey,
-        tx: SolanaSignedTransaction,
+        tx: SolanaTransactionResult,
     ) -> Result<()> {
         let event = TreasuryEvents {
             event: Some(Event::SolanaCreateDropSigned(tx)),
@@ -220,7 +230,7 @@ impl Events<SolanaNftEventKey, SolanaSignedTransaction> for Solana {
     async fn on_mint_drop(
         &self,
         key: SolanaNftEventKey,
-        tx: SolanaSignedTransaction,
+        tx: SolanaTransactionResult,
     ) -> Result<()> {
         let event = TreasuryEvents {
             event: Some(Event::SolanaMintDropSigned(tx)),
@@ -234,7 +244,7 @@ impl Events<SolanaNftEventKey, SolanaSignedTransaction> for Solana {
     async fn on_retry_create_drop(
         &self,
         key: SolanaNftEventKey,
-        tx: SolanaSignedTransaction,
+        tx: SolanaTransactionResult,
     ) -> Result<()> {
         let event = TreasuryEvents {
             event: Some(Event::SolanaRetryCreateDropSigned(tx)),
@@ -248,7 +258,7 @@ impl Events<SolanaNftEventKey, SolanaSignedTransaction> for Solana {
     async fn on_retry_mint_drop(
         &self,
         key: SolanaNftEventKey,
-        tx: SolanaSignedTransaction,
+        tx: SolanaTransactionResult,
     ) -> Result<()> {
         let event = TreasuryEvents {
             event: Some(Event::SolanaRetryMintDropSigned(tx)),
@@ -262,7 +272,7 @@ impl Events<SolanaNftEventKey, SolanaSignedTransaction> for Solana {
     async fn on_update_drop(
         &self,
         key: SolanaNftEventKey,
-        tx: SolanaSignedTransaction,
+        tx: SolanaTransactionResult,
     ) -> Result<()> {
         let event = TreasuryEvents {
             event: Some(Event::SolanaUpdateDropSigned(tx)),
@@ -276,7 +286,7 @@ impl Events<SolanaNftEventKey, SolanaSignedTransaction> for Solana {
     async fn on_transfer_asset(
         &self,
         key: SolanaNftEventKey,
-        tx: SolanaSignedTransaction,
+        tx: SolanaTransactionResult,
     ) -> Result<()> {
         let event = TreasuryEvents {
             event: Some(Event::SolanaTransferAssetSigned(tx)),
