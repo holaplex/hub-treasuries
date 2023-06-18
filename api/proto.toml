@@ -1,11 +1,10 @@
 [registry]
 endpoint = "https://schemas.holaplex.tools"
 
-
 [schemas]
 organization = 5
-nfts = 13
+nfts = 14
 customer = 2
-treasury = 15
+treasury = 16
 solana_nfts = 1
-polygon_nfts = 2
+polygon_nfts = 3
