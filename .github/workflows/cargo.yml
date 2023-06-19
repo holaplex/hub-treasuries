@@ -35,10 +35,6 @@ jobs:
         run: |
           sudo ./ci/get-protoc.sh
 
-      - name: Get protoc from github releases
-        run: |
-          sudo ./ci/get-protoc.sh
-
       - name: Install latest nightly
         uses: actions-rs/toolchain@v1
         with:
