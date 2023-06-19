@@ -155,21 +155,21 @@ impl FromStr for Blockchain {
 impl From<AssetType> for Blockchain {
     fn from(value: AssetType) -> Self {
         match value {
-            AssetType::Solana | AssetType::SolanaTest => Blockchain::Solana,
-            AssetType::Matic | AssetType::MaticTest => Blockchain::Polygon,
-            AssetType::Eth | AssetType::EthTest => Blockchain::Ethereum,
+            AssetType::Solana => Blockchain::Solana,
+            AssetType::Matic => Blockchain::Polygon,
+            AssetType::Eth => Blockchain::Ethereum,
         }
     }
 }
 
-impl TryFrom<Blockchain> for Vec<AssetType> {
+impl TryFrom<Blockchain> for AssetType {
     type Error = Error;
 
     fn try_from(value: Blockchain) -> Result<Self> {
         match value {
-            Blockchain::Solana => Ok(vec![AssetType::Solana, AssetType::SolanaTest]),
-            Blockchain::Polygon => Ok(vec![AssetType::Matic, AssetType::MaticTest]),
-            Blockchain::Ethereum => Ok(vec![AssetType::Eth, AssetType::EthTest]),
+            Blockchain::Solana => Ok(AssetType::Solana),
+            Blockchain::Polygon => Ok(AssetType::Matic),
+            Blockchain::Ethereum => Ok(AssetType::Eth),
             Blockchain::Unspecified => Err(anyhow!("Unspecified blockchain")),
         }
     }

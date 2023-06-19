@@ -5,10 +5,7 @@ use hub_core::anyhow::{anyhow, Error};
 use sea_orm::entity::prelude::*;
 
 const SOL: &str = "SOL";
-const SOL_TEST: &str = "SOL_TEST";
 const MATIC: &str = "MATIC";
-const MATIC_TEST: &str = "MATIC_TEST";
-const ETH_TEST: &str = "ETH_TEST";
 const ETH: &str = "ETH";
 
 /// Fireblocks-defined blockchain identifiers.
@@ -19,25 +16,10 @@ pub enum AssetType {
     #[graphql(name = "SOL")]
     #[sea_orm(num_value = 0)]
     Solana,
-    /// Devnet Solana
-    /// Note: Holaplex uses `SOL_TEST` for provisioning wallets on its staging environment but still submits transactions to mainnet.
-    #[graphql(name = "SOL_TEST")]
-    #[sea_orm(num_value = 1)]
-    SolanaTest,
-    /// Ploygon Mumbai Testnet
-    /// Note: Holaplex uses `MATIC_TEST` for provisioning wallets on its staging environment but still submits transactions to mainnet.
-    #[graphql(name = "MATIC_TEST")]
-    #[sea_orm(num_value = 2)]
-    MaticTest,
     /// Mainnet Polygon
     #[graphql(name = "MATIC")]
     #[sea_orm(num_value = 3)]
     Matic,
-    // Ethereum Testnet
-    /// Note: Holaplex uses `ETH_TEST` for provisioning wallets on its staging environment but still submits transactions to mainnet.
-    #[graphql(name = "ETH_TEST")]
-    #[sea_orm(num_value = 4)]
-    EthTest,
     /// Ethereum Mainnet
     #[graphql(name = "ETH")]
     #[sea_orm(num_value = 5)]
@@ -48,10 +30,7 @@ impl AssetType {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Solana => SOL,
-            Self::SolanaTest => SOL_TEST,
-            Self::MaticTest => MATIC_TEST,
             Self::Matic => MATIC,
-            Self::EthTest => ETH_TEST,
             Self::Eth => ETH,
         }
     }
@@ -67,10 +46,7 @@ impl From<AssetType> for i32 {
     fn from(value: AssetType) -> Self {
         match value {
             AssetType::Solana => 0,
-            AssetType::SolanaTest => 1,
-            AssetType::MaticTest => 2,
             AssetType::Matic => 3,
-            AssetType::EthTest => 4,
             AssetType::Eth => 5,
         }
     }
@@ -82,10 +58,7 @@ impl FromStr for AssetType {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             SOL => Ok(Self::Solana),
-            SOL_TEST => Ok(Self::SolanaTest),
             MATIC => Ok(Self::Matic),
-            MATIC_TEST => Ok(Self::MaticTest),
-            ETH_TEST => Ok(Self::EthTest),
             ETH => Ok(Self::Eth),
             &_ => Err(anyhow!("unsupported  asset_type")),
         }

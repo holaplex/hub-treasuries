@@ -22,7 +22,7 @@ use dataloaders::{
     ProjectTreasuryLoader, TreasuryLoader, TreasuryWalletsLoader, WalletLoader,
 };
 use db::Connection;
-use fireblocks::Client as FireblocksClient;
+use fireblocks::Fireblocks;
 use hub_core::{
     anyhow::{Error, Result},
     clap,
@@ -214,7 +214,7 @@ pub struct Args {
 pub struct AppState {
     pub schema: AppSchema,
     pub connection: Connection,
-    pub fireblocks: FireblocksClient,
+    pub fireblocks: Fireblocks,
     pub producer: Producer<TreasuryEvents>,
     pub credits: CreditsClient<Actions>,
 }
@@ -224,7 +224,7 @@ impl AppState {
     pub fn new(
         schema: AppSchema,
         connection: Connection,
-        fireblocks: FireblocksClient,
+        fireblocks: Fireblocks,
         producer: Producer<TreasuryEvents>,
         credits: CreditsClient<Actions>,
     ) -> Self {

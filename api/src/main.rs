@@ -42,7 +42,7 @@ pub fn main() {
             let state = AppState::new(
                 schema,
                 connection.clone(),
-                fireblocks.client().clone(),
+                fireblocks.clone(),
                 producer.clone(),
                 credits,
             );
