@@ -1,5 +1,5 @@
 use async_graphql::{Context, Error, InputObject, Object, Result, SimpleObject};
-use fireblocks::{objects::vault::CreateVaultWallet, Client as FireblocksClient};
+use fireblocks::{objects::vault::CreateVaultWallet, Fireblocks};
 use hub_core::{
     chrono::Utc,
     credits::{CreditsClient, TransactionId},
@@ -40,7 +40,7 @@ impl Mutation {
             balance,
             ..
         } = ctx.data::<AppContext>()?;
-        let fireblocks = ctx.data::<FireblocksClient>()?;
+        let fireblocks = ctx.data::<Fireblocks>()?;
         let credits = ctx.data::<CreditsClient<Actions>>()?;
         let conn = db.get();
         let producer = ctx.data::<Producer<TreasuryEvents>>()?;
@@ -49,15 +49,13 @@ impl Mutation {
             asset_type,
         } = input;
 
-        let user_id = user_id
-            .0
-            .ok_or_else(|| Error::new("X-USER-ID header not found"))?;
+        let user_id = user_id.0.ok_or(Error::new("X-USER-ID header not found"))?;
         let org_id = organization_id
             .0
-            .ok_or_else(|| Error::new("X-ORGANIZATION-ID header not found"))?;
+            .ok_or(Error::new("X-ORGANIZATION-ID header not found"))?;
         let balance = balance
             .0
-            .ok_or_else(|| Error::new("X-CREDIT-BALANCE header not found"))?;
+            .ok_or(Error::new("X-CREDIT-BALANCE header not found"))?;
 
         let (customer_treasury, treasury) = customer_treasuries::Entity::find()
             .join(
@@ -68,9 +66,9 @@ impl Mutation {
             .select_also(treasuries::Entity)
             .one(conn)
             .await?
-            .ok_or_else(|| Error::new("customer treasury not found"))?;
+            .ok_or(Error::new("customer treasury not found"))?;
 
-        let treasury = treasury.ok_or_else(|| Error::new("treasury not found"))?;
+        let treasury = treasury.ok_or(Error::new("treasury not found"))?;
 
         let deduction_id = submit_pending_deduction(credits, db, DeductionParams {
             balance,
@@ -83,9 +81,11 @@ impl Mutation {
         .await?;
 
         let vault_asset = fireblocks
-            .create_vault_wallet(
+            .client()
+            .create()
+            .wallet(
                 treasury.vault_id.clone(),
-                asset_type.into(),
+                fireblocks.assets().id(asset_type.as_str()),
                 CreateVaultWallet {
                     eos_account_name: None,
                 },
@@ -97,11 +97,12 @@ impl Mutation {
             .await?;
 
         let wallet = update_wallet_address(db, vault_asset.address, deduction_id).await?;
+        let project_id = customer_treasury.project_id.to_string();
 
         let event = TreasuryEvents {
             event: Some(treasury_events::Event::CustomerWalletCreated(
                 treasury_events::CustomerWallet {
-                    project_id: customer_treasury.project_id.to_string(),
+                    project_id: project_id.clone(),
                     customer_id: customer_treasury.customer_id.to_string(),
                     blockchain: asset_type.into(),
                 },
@@ -110,6 +111,7 @@ impl Mutation {
         let key = TreasuryEventKey {
             id: treasury.id.to_string(),
             user_id: user_id.to_string(),
+            project_id,
         };
 
         producer.send(Some(&event), Some(&key)).await?;
@@ -162,7 +164,7 @@ async fn submit_pending_deduction(
     }
 
     let id = match asset_type {
-        AssetType::Solana | AssetType::SolanaTest => {
+        AssetType::Solana => {
             credits
                 .submit_pending_deduction(
                     org_id,
@@ -173,13 +175,24 @@ async fn submit_pending_deduction(
                 )
                 .await?
         },
-        _ => {
-            return Err(Error::new("blockchain not supported yet"));
+        AssetType::Matic => {
+            credits
+                .submit_pending_deduction(
+                    org_id,
+                    user_id,
+                    Actions::CreateWallet,
+                    hub_core::credits::Blockchain::Polygon,
+                    balance,
+                )
+                .await?
+        },
+        AssetType::Eth => {
+            return Err(Error::new("ethereum not supported yet"));
         },
     };
 
     let deduction_id = id
-        .ok_or_else(|| Error::new("failed to generate credits deduction id"))?
+        .ok_or(Error::new("failed to generate credits deduction id"))?
         .0;
 
     let wallet_model = wallets::ActiveModel {
@@ -209,7 +222,7 @@ async fn update_wallet_address(
         .filter(wallets::Column::DeductionId.eq(deduction_id))
         .one(db.get())
         .await?
-        .ok_or_else(|| Error::new("wallet not found"))?;
+        .ok_or(Error::new("wallet not found"))?;
 
     let mut wallet_am: wallets::ActiveModel = wallet_model.into();
     wallet_am.address = Set(Some(address));
@@ -237,15 +250,9 @@ pub struct CreateCustomerWalletPayload {
 impl From<wallets::AssetType> for treasury_events::Blockchain {
     fn from(value: wallets::AssetType) -> Self {
         match value {
-            wallets::AssetType::Solana | wallets::AssetType::SolanaTest => {
-                treasury_events::Blockchain::Solana
-            },
-            wallets::AssetType::MaticTest | wallets::AssetType::Matic => {
-                treasury_events::Blockchain::Polygon
-            },
-            wallets::AssetType::EthTest | wallets::AssetType::Eth => {
-                treasury_events::Blockchain::Ethereum
-            },
+            wallets::AssetType::Solana => treasury_events::Blockchain::Solana,
+            wallets::AssetType::Matic => treasury_events::Blockchain::Polygon,
+            wallets::AssetType::Eth => treasury_events::Blockchain::Ethereum,
         }
     }
 }

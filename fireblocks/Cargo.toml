@@ -15,12 +15,12 @@ categories = ["cryptography::cryptocurrencies", "web-programming"]
 
 
 [dependencies]
-sha2 = "~0.10"
-hex = "~0.4.0"
-serde = { version = "1.0.91", features = ["derive"] }
-jsonwebtoken = "8.2.0"
-reqwest = { version = "0.11.14", features = ["json"] }
-async-graphql = { version = "5.0.4", features = ["chrono", "uuid", "log", "dataloader", "apollo_tracing"] }
+sha2 = "0.10.6"
+hex = "0.4.3"
+serde = { version = "1.0.163", features = ["derive"] }
+jsonwebtoken = "8.3.0"
+reqwest = { version = "0.11.18", features = ["json"] }
+async-graphql = { version = "5.0.9", features = ["chrono", "uuid", "log", "dataloader", "apollo_tracing"] }
 
 [dependencies.hub-core]
 package = "holaplex-hub-core"

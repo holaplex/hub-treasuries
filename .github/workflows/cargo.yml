@@ -29,8 +29,11 @@ jobs:
             libsasl2-dev \
             libssl-dev \
             libudev-dev \
-            pkg-config \
-            protobuf-compiler
+            pkg-config
+
+      - name: Get protoc from github releases
+        run: |
+          sudo ./ci/get-protoc.sh
 
       - name: Get protoc from github releases
         run: |
