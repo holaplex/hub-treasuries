@@ -1,4 +1,7 @@
-use fireblocks::objects::vault::{CreateVault, CreateVaultWallet};
+use fireblocks::{
+    assets::{ETH, ETH_TEST, MATIC, MATIC_TEST, SOL, SOL_TEST},
+    objects::vault::{CreateVault, CreateVaultWallet},
+};
 use hub_core::{prelude::*, uuid::Uuid};
 use sea_orm::{prelude::*, Set};
 
@@ -86,23 +89,16 @@ impl OrganizationEventHandler for Processor {
             .await
             .context("failed to insert project treasuries")?;
 
-        info!("treasury created for project {:?}", project.id);
-
-        // create vault wallets for supported assets
-        for asset_type in self.fireblocks.assets().ids() {
-            let asset_type = AssetType::from_str(asset_type)?;
+        for id in self.fireblocks.assets().ids() {
+            let asset_type = AssetType::from_str(&id)?;
 
             let vault_asset = self
                 .fireblocks
                 .client()
                 .create()
-                .wallet(
-                    treasury.vault_id.clone(),
-                    asset_type.into(),
-                    CreateVaultWallet {
-                        eos_account_name: None,
-                    },
-                )
+                .wallet(treasury.vault_id.clone(), id, CreateVaultWallet {
+                    eos_account_name: None,
+                })
                 .await?;
 
             let active_model = wallets::ActiveModel {
@@ -144,9 +140,9 @@ impl FromStr for Blockchain {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "SOL" | "SOL_TEST" => Ok(Blockchain::Solana),
-            "MATIC" | "MATIC_TEST" => Ok(Blockchain::Polygon),
-            "ETH" | "ETH_TEST" => Ok(Blockchain::Ethereum),
+            SOL | SOL_TEST => Ok(Blockchain::Solana),
+            MATIC | MATIC_TEST => Ok(Blockchain::Polygon),
+            ETH | ETH_TEST => Ok(Blockchain::Ethereum),
             _ => Err(()),
         }
     }

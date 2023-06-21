@@ -1,12 +1,9 @@
 use std::str::FromStr;
 
 use async_graphql::{Enum, Result, SimpleObject};
+use fireblocks::assets::{ETH, ETH_TEST, MATIC, MATIC_TEST, SOL, SOL_TEST};
 use hub_core::anyhow::{anyhow, Error};
 use sea_orm::entity::prelude::*;
-
-const SOL: &str = "SOL";
-const MATIC: &str = "MATIC";
-const ETH: &str = "ETH";
 
 /// Fireblocks-defined blockchain identifiers.
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
@@ -57,9 +54,9 @@ impl FromStr for AssetType {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            SOL => Ok(Self::Solana),
-            MATIC => Ok(Self::Matic),
-            ETH => Ok(Self::Eth),
+            SOL | SOL_TEST => Ok(Self::Solana),
+            MATIC | MATIC_TEST => Ok(Self::Matic),
+            ETH | ETH_TEST => Ok(Self::Eth),
             &_ => Err(anyhow!("unsupported  asset_type")),
         }
     }
