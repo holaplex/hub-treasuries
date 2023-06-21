@@ -110,7 +110,7 @@ impl Polygon {
 
                 self.transfer_asset(key, safe_txn_data).await?;
             },
-            None => (),
+            Some(_) | None => (),
         }
 
         Ok(())

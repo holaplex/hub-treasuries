@@ -158,7 +158,7 @@ impl Client {
     ///
     /// Transaction details when the transaction is completed.
     pub async fn wait_on_transaction_completion(&self, id: String) -> Result<TransactionDetails> {
-        let mut interval = time::interval(time::Duration::from_millis(250));
+        let mut interval = time::interval(time::Duration::from_secs(1));
 
         loop {
             let tx_details = self.read().transaction(id.clone()).await?;
