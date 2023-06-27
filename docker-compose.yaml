@@ -6,7 +6,7 @@ services:
     env_file:
       - .env
     ports:
-      - 5438:5432
+      - 5443:5432
     volumes: 
       - hub_treasuries_db:/var/lib/postgresql/data
   redpanda:

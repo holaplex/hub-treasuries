@@ -13,7 +13,7 @@ use hub_core::{
     tokio::{self, task},
 };
 use poem::{get, listener::TcpListener, middleware::AddData, post, EndpointExt, Route, Server};
-use solana_client::rpc_client::RpcClient;
+
 pub fn main() {
     let opts = hub_core::StartConfig {
         service_name: "hub-treasuries",
@@ -22,8 +22,6 @@ pub fn main() {
     hub_core::run(opts, |common, args| {
         let Args {
             port,
-            solana_endpoint,
-            fireblocks_supported_asset_ids,
             db,
             fireblocks,
         } = args;
@@ -34,9 +32,12 @@ pub fn main() {
                 .context("failed to get database connection")?;
 
             let schema = build_schema();
-            let fireblocks = fireblocks::Client::new(fireblocks)?;
-            let rpc_client = Arc::new(RpcClient::new(solana_endpoint));
+            let fireblocks = fireblocks::Fireblocks::new(fireblocks)?;
             let producer = common.producer_cfg.build::<proto::TreasuryEvents>().await?;
+
+            let event_processor =
+                events::Processor::new(connection.clone(), producer.clone(), fireblocks.clone());
+
             let credits = common.credits_cfg.build::<Actions>().await?;
             let state = AppState::new(
                 schema,
@@ -52,29 +53,13 @@ pub fn main() {
                 {
                     let mut stream = cons.stream();
                     loop {
-                        let fireblocks = fireblocks.clone();
-                        let connection = connection.clone();
-                        let rpc_client = rpc_client.clone();
-                        let fireblocks_supported_asset_ids = fireblocks_supported_asset_ids.clone();
-                        let producer = producer.clone();
+                        let event_processor = event_processor.clone();
 
                         match stream.next().await {
                             Some(Ok(msg)) => {
                                 info!(?msg, "message received");
 
-                                tokio::spawn(async move {
-                                    {
-                                        events::process(
-                                            msg,
-                                            connection.clone(),
-                                            fireblocks.clone(),
-                                            fireblocks_supported_asset_ids,
-                                            &rpc_client,
-                                            producer,
-                                        )
-                                        .await
-                                    }
-                                });
+                                tokio::spawn(async move { event_processor.process(msg).await });
                                 task::yield_now().await;
                             },
                             None => (),

@@ -10,8 +10,8 @@ RUN apt-get update -y && \
     libsasl2-dev \
     libssl-dev \
     libudev-dev \
-    pkg-config \
     wget \
+    pkg-config \
   && \
   rm -rf /var/lib/apt/lists/*
 

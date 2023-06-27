@@ -22,7 +22,7 @@ pub struct CreateTransaction {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ExtraParameters {
-    Content(String),
+    ContractCallData(String),
     RawMessageData(RawMessageData),
 }
 
@@ -55,7 +55,9 @@ pub struct TransferPeerPath {
 pub struct DestinationTransferPeerPath {
     #[serde(rename = "type")]
     pub peer_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub one_time_address: Option<OneTimeAddress>,
 }
 
@@ -75,6 +77,7 @@ pub struct TransactionRequestDestination {
 #[skip_serializing_none]
 pub struct OneTimeAddress {
     pub address: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tag: Option<String>,
 }
 
