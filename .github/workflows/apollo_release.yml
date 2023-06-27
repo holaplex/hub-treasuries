@@ -65,6 +65,7 @@ jobs:
       - name: Cargo run
         env:
           PORT: 3000
+          FIREBLOCKS_API_KEY: ""
         run: export $(xargs < .env) && cargo run --bin holaplex-${{ github.event.repository.name }} &
 
       - name: Setup Apollo Studio variant
