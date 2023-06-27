@@ -5,6 +5,7 @@ pub const MATIC: &str = "MATIC";
 pub const ETH: &str = "ETH";
 pub const SOL_TEST: &str = "SOL_TEST";
 pub const MATIC_TEST: &str = "MATIC_POLYGON_MUMBAI";
+pub const MATIC_POLYGON: &str = "MATIC_POLYGON";
 pub const ETH_TEST: &str = "ETH_TEST";
 
 #[derive(Clone, Debug)]
@@ -37,6 +38,7 @@ impl Assets {
     pub fn id(&self, id: &str) -> String {
         match (self.test_mode, id) {
             (true, MATIC) => MATIC_TEST.to_string(),
+            (false, MATIC) => MATIC_POLYGON.to_string(),
             (true, _) => format!("{id}_TEST"),
             (false, _) => id.to_string(),
         }
