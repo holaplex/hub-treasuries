@@ -42,9 +42,9 @@ impl From<AssetType> for String {
 impl From<AssetType> for i32 {
     fn from(value: AssetType) -> Self {
         match value {
-            AssetType::Solana => 0,
-            AssetType::Matic => 3,
-            AssetType::Eth => 5,
+            AssetType::Solana => 1,
+            AssetType::Matic => 2,
+            AssetType::Eth => 3,
         }
     }
 }
