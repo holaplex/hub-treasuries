@@ -96,7 +96,7 @@ impl Mutation {
             .confirm_deduction(TransactionId(deduction_id))
             .await?;
 
-        let wallet = update_wallet_address(db, vault_asset.address, deduction_id).await?;
+        let wallet = update_wallet_address(db, vault_asset.address.clone(), deduction_id).await?;
         let project_id = customer_treasury.project_id.to_string();
 
         let event = TreasuryEvents {
@@ -105,6 +105,7 @@ impl Mutation {
                     project_id: project_id.clone(),
                     customer_id: customer_treasury.customer_id.to_string(),
                     blockchain: asset_type.into(),
+                    wallet_address: vault_asset.address,
                 },
             )),
         };
