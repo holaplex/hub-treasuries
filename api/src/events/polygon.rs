@@ -162,6 +162,14 @@ impl Transactions<PolygonNftEventKey, PolygonTransaction, PolygonTransactionResu
         Ok(tx)
     }
 
+    async fn create_collection(
+        &self,
+        _key: PolygonNftEventKey,
+        _payload: PolygonTransaction,
+    ) -> Result<PolygonTransactionResult> {
+        unreachable!()
+    }
+
     async fn update_drop(
         &self,
         key: PolygonNftEventKey,
@@ -174,6 +182,14 @@ impl Transactions<PolygonNftEventKey, PolygonTransaction, PolygonTransactionResu
         self.on_update_drop(key, tx.clone()).await?;
 
         Ok(tx)
+    }
+
+    async fn update_collection(
+        &self,
+        _key: PolygonNftEventKey,
+        _payload: PolygonTransaction,
+    ) -> Result<PolygonTransactionResult> {
+        unreachable!()
     }
 
     async fn mint_drop(
@@ -215,6 +231,14 @@ impl Transactions<PolygonNftEventKey, PolygonTransaction, PolygonTransactionResu
         self.on_retry_create_drop(key, tx.clone()).await?;
 
         Ok(tx)
+    }
+
+    async fn retry_create_collection(
+        &self,
+        _key: PolygonNftEventKey,
+        _payload: PolygonTransaction,
+    ) -> Result<PolygonTransactionResult> {
+        unreachable!()
     }
 
     async fn retry_mint_drop(
@@ -291,6 +315,14 @@ impl Events<PolygonNftEventKey, PolygonTransactionResult> for Polygon {
         Ok(())
     }
 
+    async fn on_create_collection(
+        &self,
+        _key: PolygonNftEventKey,
+        _tx: PolygonTransactionResult,
+    ) -> Result<()> {
+        unreachable!()
+    }
+
     async fn on_mint_drop(
         &self,
         key: PolygonNftEventKey,
@@ -319,6 +351,14 @@ impl Events<PolygonNftEventKey, PolygonTransactionResult> for Polygon {
         Ok(())
     }
 
+    async fn on_retry_create_collection(
+        &self,
+        _key: PolygonNftEventKey,
+        _tx: PolygonTransactionResult,
+    ) -> Result<()> {
+        unreachable!()
+    }
+
     async fn on_retry_mint_drop(
         &self,
         key: PolygonNftEventKey,
@@ -345,6 +385,14 @@ impl Events<PolygonNftEventKey, PolygonTransactionResult> for Polygon {
         self.producer.send(Some(&event), Some(&key.into())).await?;
 
         Ok(())
+    }
+
+    async fn on_update_collection(
+        &self,
+        _key: PolygonNftEventKey,
+        _tx: PolygonTransactionResult,
+    ) -> Result<()> {
+        unreachable!()
     }
 
     async fn on_transfer_asset(
