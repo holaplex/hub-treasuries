@@ -12,6 +12,8 @@ pub enum TxType {
     TransferMint,
     #[sea_orm(string_value = "update_metadata")]
     UpdateMetadata,
+    #[sea_orm(string_value = "create_collection")]
+    CreateCollection,
 }
 
 impl From<TxType> for String {
@@ -21,6 +23,7 @@ impl From<TxType> for String {
             TxType::MintEdition => "MintEdition".to_string(),
             TxType::TransferMint => "TransferMint".to_string(),
             TxType::UpdateMetadata => "UpdateMetadata".to_string(),
+            TxType::CreateCollection => "CreateCollection".to_string(),
         }
     }
 }
