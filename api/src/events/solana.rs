@@ -95,7 +95,7 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaTransaction
             .send_transaction(TxType::CreateCollection, key.clone(), payload)
             .await?;
 
-        self.on_create_drop(key, tx.clone()).await?;
+        self.on_create_collection(key, tx.clone()).await?;
 
         Ok(tx)
     }
@@ -151,6 +151,7 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaTransaction
             .await?;
 
         self.on_transfer_asset(key, tx.clone()).await?;
+
         Ok(tx)
     }
 
