@@ -192,6 +192,22 @@ impl Transactions<PolygonNftEventKey, PolygonTransaction, PolygonTransactionResu
         unreachable!()
     }
 
+    async fn mint_to_collection(
+        &self,
+        _key: PolygonNftEventKey,
+        _payload: PolygonTransaction,
+    ) -> Result<PolygonTransactionResult> {
+        unreachable!()
+    }
+
+    async fn retry_mint_to_collection(
+        &self,
+        _key: PolygonNftEventKey,
+        _payload: PolygonTransaction,
+    ) -> Result<PolygonTransactionResult> {
+        unreachable!()
+    }
+
     async fn mint_drop(
         &self,
         key: PolygonNftEventKey,
@@ -352,6 +368,22 @@ impl Events<PolygonNftEventKey, PolygonTransactionResult> for Polygon {
     }
 
     async fn on_retry_create_collection(
+        &self,
+        _key: PolygonNftEventKey,
+        _tx: PolygonTransactionResult,
+    ) -> Result<()> {
+        unreachable!()
+    }
+
+    async fn on_mint_to_collection(
+        &self,
+        _key: PolygonNftEventKey,
+        _tx: PolygonTransactionResult,
+    ) -> Result<()> {
+        unreachable!()
+    }
+
+    async fn on_retry_mint_to_collection(
         &self,
         _key: PolygonNftEventKey,
         _tx: PolygonTransactionResult,
