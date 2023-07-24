@@ -83,6 +83,14 @@ impl Processor {
                     Some(SolanaNftEvent::RetryCreateCollectionSigningRequested(payload)) => {
                         solana.retry_create_collection(key.clone(), payload).await?;
                     },
+                    Some(SolanaNftEvent::MintToCollectionSigningRequested(payload)) => {
+                        solana.mint_to_collection(key.clone(), payload).await?;
+                    },
+                    Some(SolanaNftEvent::RetryMintToCollectionSigningRequested(payload)) => {
+                        solana
+                            .retry_mint_to_collection(key.clone(), payload)
+                            .await?;
+                    },
                     _ => (),
                 };
 

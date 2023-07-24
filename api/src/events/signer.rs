@@ -21,6 +21,8 @@ pub trait Events<K, T> {
     async fn on_create_collection(&self, key: K, tx: T) -> Result<()>;
     async fn on_update_collection(&self, key: K, tx: T) -> Result<()>;
     async fn on_retry_create_collection(&self, key: K, tx: T) -> Result<()>;
+    async fn on_mint_to_collection(&self, key: K, tx: T) -> Result<()>;
+    async fn on_retry_mint_to_collection(&self, key: K, tx: T) -> Result<()>;
 }
 
 #[async_trait]
@@ -34,6 +36,8 @@ pub trait Transactions<K, P, T>: Sign<K, P, T> + Events<K, T> {
     async fn create_collection(&self, key: K, payload: P) -> Result<T>;
     async fn update_collection(&self, key: K, payload: P) -> Result<T>;
     async fn retry_create_collection(&self, key: K, payload: P) -> Result<T>;
+    async fn mint_to_collection(&self, key: K, payload: P) -> Result<T>;
+    async fn retry_mint_to_collection(&self, key: K, payload: P) -> Result<T>;
 }
 
 pub(crate) async fn find_vault_id_by_wallet_address(
