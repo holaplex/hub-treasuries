@@ -14,6 +14,8 @@ mod m20230511_015035_add_deduction_id_to_wallets;
 mod m20230511_022149_add_indexes_for_wallets_table;
 mod m20230518_033212_set_default_timestamp;
 mod m20230619_135838_remove_test_from_asset_id_on_wallets;
+mod m20230721_145312_add_create_collection_to_tx_type_enum;
+mod m20230724_142109_add_mint_to_collection_to_tx_type_enum;
 
 pub struct Migrator;
 
@@ -35,6 +37,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20230511_022149_add_indexes_for_wallets_table::Migration),
             Box::new(m20230518_033212_set_default_timestamp::Migration),
             Box::new(m20230619_135838_remove_test_from_asset_id_on_wallets::Migration),
+            Box::new(m20230721_145312_add_create_collection_to_tx_type_enum::Migration),
+            Box::new(m20230724_142109_add_mint_to_collection_to_tx_type_enum::Migration),
         ]
     }
 }

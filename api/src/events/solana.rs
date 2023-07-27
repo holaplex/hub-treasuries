@@ -86,6 +86,20 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaTransaction
         Ok(tx)
     }
 
+    async fn create_collection(
+        &self,
+        key: SolanaNftEventKey,
+        payload: SolanaPendingTransaction,
+    ) -> Result<SolanaTransactionResult> {
+        let tx = self
+            .send_transaction(TxType::CreateCollection, key.clone(), payload)
+            .await?;
+
+        self.on_create_collection(key, tx.clone()).await?;
+
+        Ok(tx)
+    }
+
     async fn update_drop(
         &self,
         key: SolanaNftEventKey,
@@ -96,6 +110,20 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaTransaction
             .await?;
 
         self.on_update_drop(key, tx.clone()).await?;
+
+        Ok(tx)
+    }
+
+    async fn update_collection(
+        &self,
+        key: SolanaNftEventKey,
+        payload: SolanaPendingTransaction,
+    ) -> Result<SolanaTransactionResult> {
+        let tx = self
+            .send_transaction(TxType::UpdateMetadata, key.clone(), payload)
+            .await?;
+
+        self.on_update_collection(key, tx.clone()).await?;
 
         Ok(tx)
     }
@@ -123,6 +151,7 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaTransaction
             .await?;
 
         self.on_transfer_asset(key, tx.clone()).await?;
+
         Ok(tx)
     }
 
@@ -139,6 +168,20 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaTransaction
         Ok(tx)
     }
 
+    async fn retry_create_collection(
+        &self,
+        key: SolanaNftEventKey,
+        payload: SolanaPendingTransaction,
+    ) -> Result<SolanaTransactionResult> {
+        let tx = self
+            .send_transaction(TxType::CreateCollection, key.clone(), payload)
+            .await?;
+
+        self.on_retry_create_collection(key, tx.clone()).await?;
+
+        Ok(tx)
+    }
+
     async fn retry_mint_drop(
         &self,
         key: SolanaNftEventKey,
@@ -149,6 +192,34 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaTransaction
             .await?;
 
         self.on_retry_mint_drop(key, tx.clone()).await?;
+        Ok(tx)
+    }
+
+    async fn mint_to_collection(
+        &self,
+        key: SolanaNftEventKey,
+        payload: SolanaPendingTransaction,
+    ) -> Result<SolanaTransactionResult> {
+        let tx = self
+            .send_transaction(TxType::MintToCollection, key.clone(), payload)
+            .await?;
+
+        self.on_mint_to_collection(key, tx.clone()).await?;
+
+        Ok(tx)
+    }
+
+    async fn retry_mint_to_collection(
+        &self,
+        key: SolanaNftEventKey,
+        payload: SolanaPendingTransaction,
+    ) -> Result<SolanaTransactionResult> {
+        let tx = self
+            .send_transaction(TxType::MintToCollection, key.clone(), payload)
+            .await?;
+
+        self.on_retry_mint_to_collection(key, tx.clone()).await?;
+
         Ok(tx)
     }
 }
@@ -227,6 +298,20 @@ impl Events<SolanaNftEventKey, SolanaTransactionResult> for Solana {
         Ok(())
     }
 
+    async fn on_create_collection(
+        &self,
+        key: SolanaNftEventKey,
+        tx: SolanaTransactionResult,
+    ) -> Result<()> {
+        let event = TreasuryEvents {
+            event: Some(Event::SolanaCreateCollectionSigned(tx)),
+        };
+
+        self.producer.send(Some(&event), Some(&key.into())).await?;
+
+        Ok(())
+    }
+
     async fn on_mint_drop(
         &self,
         key: SolanaNftEventKey,
@@ -241,6 +326,34 @@ impl Events<SolanaNftEventKey, SolanaTransactionResult> for Solana {
         Ok(())
     }
 
+    async fn on_mint_to_collection(
+        &self,
+        key: SolanaNftEventKey,
+        tx: SolanaTransactionResult,
+    ) -> Result<()> {
+        let event = TreasuryEvents {
+            event: Some(Event::SolanaMintToCollectionSigned(tx)),
+        };
+
+        self.producer.send(Some(&event), Some(&key.into())).await?;
+
+        Ok(())
+    }
+
+    async fn on_retry_mint_to_collection(
+        &self,
+        key: SolanaNftEventKey,
+        tx: SolanaTransactionResult,
+    ) -> Result<()> {
+        let event = TreasuryEvents {
+            event: Some(Event::SolanaRetryMintToCollectionSigned(tx)),
+        };
+
+        self.producer.send(Some(&event), Some(&key.into())).await?;
+
+        Ok(())
+    }
+
     async fn on_retry_create_drop(
         &self,
         key: SolanaNftEventKey,
@@ -248,6 +361,20 @@ impl Events<SolanaNftEventKey, SolanaTransactionResult> for Solana {
     ) -> Result<()> {
         let event = TreasuryEvents {
             event: Some(Event::SolanaRetryCreateDropSigned(tx)),
+        };
+
+        self.producer.send(Some(&event), Some(&key.into())).await?;
+
+        Ok(())
+    }
+
+    async fn on_retry_create_collection(
+        &self,
+        key: SolanaNftEventKey,
+        tx: SolanaTransactionResult,
+    ) -> Result<()> {
+        let event = TreasuryEvents {
+            event: Some(Event::SolanaRetryCreateCollectionSigned(tx)),
         };
 
         self.producer.send(Some(&event), Some(&key.into())).await?;
@@ -276,6 +403,20 @@ impl Events<SolanaNftEventKey, SolanaTransactionResult> for Solana {
     ) -> Result<()> {
         let event = TreasuryEvents {
             event: Some(Event::SolanaUpdateDropSigned(tx)),
+        };
+
+        self.producer.send(Some(&event), Some(&key.into())).await?;
+
+        Ok(())
+    }
+
+    async fn on_update_collection(
+        &self,
+        key: SolanaNftEventKey,
+        tx: SolanaTransactionResult,
+    ) -> Result<()> {
+        let event = TreasuryEvents {
+            event: Some(Event::SolanaUpdateCollectionSigned(tx)),
         };
 
         self.producer.send(Some(&event), Some(&key.into())).await?;
