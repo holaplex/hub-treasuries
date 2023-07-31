@@ -38,6 +38,7 @@ pub trait Transactions<K, P, T>: Sign<K, P, T> + Events<K, T> {
     async fn retry_create_collection(&self, key: K, payload: P) -> Result<T>;
     async fn mint_to_collection(&self, key: K, payload: P) -> Result<T>;
     async fn retry_mint_to_collection(&self, key: K, payload: P) -> Result<T>;
+    async fn update_collection_mint(&self, key: K, payload: P) -> Result<T>;
 }
 
 pub(crate) async fn find_vault_id_by_wallet_address(

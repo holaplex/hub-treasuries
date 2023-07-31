@@ -222,6 +222,21 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaTransaction
 
         Ok(tx)
     }
+
+    async fn update_collection_mint(
+        &self,
+        key: SolanaNftEventKey,
+        payload: SolanaPendingTransaction,
+    ) -> Result<SolanaTransactionResult> {
+        let tx = self
+            .send_transaction(TxType::MintToCollection, key.clone(), payload)
+            .await?;
+
+        self.on_retry_mint_to_collection(key, tx.clone()).await?;
+
+        Ok(tx)
+    }
+
 }
 
 #[async_trait]

@@ -1879,6 +1879,7 @@ dependencies = [
  "holaplex-hub-core-build",
  "poem",
  "prost",
+ "prost-types",
  "sea-orm",
  "serde",
  "solana-sdk",
