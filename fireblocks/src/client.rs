@@ -475,6 +475,7 @@ impl CreateRequestBuilder {
             treat_as_gross_amount: None,
             customer_ref_id: None,
             amount: "0".to_string(),
+            feelevel: None,
             extra_parameters: Some(ExtraParameters::RawMessageData(RawMessageData {
                 messages: vec![UnsignedMessage {
                     content: hex::encode(&message),
@@ -512,6 +513,7 @@ impl CreateRequestBuilder {
             treat_as_gross_amount: None,
             customer_ref_id: None,
             amount: "0".to_string(),
+            feelevel: Some("HIGH".to_string()),
             extra_parameters: Some(ExtraParameters::ContractCallData(hex::encode(data))),
             note: Some(note),
         };

@@ -13,6 +13,8 @@ pub struct CreateTransaction {
     pub destinations: Option<Vec<TransactionRequestDestination>>,
     pub amount: String,
     pub treat_as_gross_amount: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub feelevel: Option<String>,
     pub note: Option<String>,
     pub operation: TransactionOperation,
     pub customer_ref_id: Option<String>,
