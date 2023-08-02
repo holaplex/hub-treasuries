@@ -232,7 +232,7 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaTransaction
             .send_transaction(TxType::MintToCollection, key.clone(), payload)
             .await?;
 
-        self.on_retry_mint_to_collection(key, tx.clone()).await?;
+        self.on_update_collection_mint(key, tx.clone()).await?;
 
         Ok(tx)
     }
@@ -432,6 +432,20 @@ impl Events<SolanaNftEventKey, SolanaTransactionResult> for Solana {
     ) -> Result<()> {
         let event = TreasuryEvents {
             event: Some(Event::SolanaUpdateCollectionSigned(tx)),
+        };
+
+        self.producer.send(Some(&event), Some(&key.into())).await?;
+
+        Ok(())
+    }
+
+    async fn on_update_collection_mint(
+        &self,
+        key: SolanaNftEventKey,
+        tx: SolanaTransactionResult,
+    ) -> Result<()> {
+        let event = TreasuryEvents {
+            event: Some(Event::SolanaUpdateCollectionMintSigned(tx)),
         };
 
         self.producer.send(Some(&event), Some(&key.into())).await?;

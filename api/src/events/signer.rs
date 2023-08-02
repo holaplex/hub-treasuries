@@ -23,6 +23,7 @@ pub trait Events<K, T> {
     async fn on_retry_create_collection(&self, key: K, tx: T) -> Result<()>;
     async fn on_mint_to_collection(&self, key: K, tx: T) -> Result<()>;
     async fn on_retry_mint_to_collection(&self, key: K, tx: T) -> Result<()>;
+    async fn on_update_collection_mint(&self, key: K, tx: T) -> Result<()>;
 }
 
 #[async_trait]

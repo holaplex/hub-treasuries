@@ -448,6 +448,16 @@ impl Events<PolygonNftEventKey, PolygonTransactionResult> for Polygon {
 
         Ok(())
     }
+
+    async fn on_update_collection_mint(
+        &self,
+        _key: PolygonNftEventKey,
+        _tx: PolygonTransactionResult,
+    ) -> Result<()> {
+        unreachable!()
+
+      
+    }
 }
 
 impl From<PolygonNftEventKey> for TreasuryEventKey {
