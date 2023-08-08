@@ -110,7 +110,7 @@ impl Polygon {
 
                 self.transfer_asset(key, safe_txn_data).await?;
             },
-            Some(PolygonNftEvent::UpdateMintsOwner(_))  |  None => (),
+            Some(PolygonNftEvent::UpdateMintsOwner(_)) | None => (),
         }
 
         Ok(())
@@ -272,6 +272,14 @@ impl Transactions<PolygonNftEventKey, PolygonTransaction, PolygonTransactionResu
     }
 
     async fn update_collection_mint(
+        &self,
+        _key: PolygonNftEventKey,
+        _payload: PolygonTransaction,
+    ) -> Result<PolygonTransactionResult> {
+        unreachable!()
+    }
+
+    async fn retry_update_collection_mint(
         &self,
         _key: PolygonNftEventKey,
         _payload: PolygonTransaction,
@@ -455,8 +463,14 @@ impl Events<PolygonNftEventKey, PolygonTransactionResult> for Polygon {
         _tx: PolygonTransactionResult,
     ) -> Result<()> {
         unreachable!()
+    }
 
-      
+    async fn on_retry_update_mint(
+        &self,
+        _key: PolygonNftEventKey,
+        _tx: PolygonTransactionResult,
+    ) -> Result<()> {
+        unreachable!()
     }
 }
 

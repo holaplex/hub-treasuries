@@ -94,6 +94,9 @@ impl Processor {
                     Some(SolanaNftEvent::UpdateCollectionMintSigningRequested(payload)) => {
                         solana.update_collection_mint(key.clone(), payload).await?;
                     },
+                    Some(SolanaNftEvent::RetryUpdateMintSigningRequested(payload)) => {
+                        solana.update_collection_mint(key.clone(), payload).await?;
+                    },
                     _ => (),
                 };
 
