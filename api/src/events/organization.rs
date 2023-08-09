@@ -18,32 +18,8 @@ use crate::{
     },
 };
 
-#[async_trait]
-pub trait OrganizationEventHandler {
-    /// Creates a treasury for a project in an organization.
-    ///
-    /// # Arguments
-    /// * conn - A database connection object.
-    /// * fireblocks - A Fireblocks client object.
-    /// * producer - A Kafka producer object for sending events.
-    /// * key - The organization event key.
-    /// * project - The project details.
-    ///
-    /// # Errors
-    /// This function may return an error in the following cases:
-    /// * Failed to create a vault or wallets in Fireblocks.
-    /// * Failed to insert the treasury or project treasuries or wallet record in the local database.
-    /// * Failed to send the treasury event using the provided Kafka producer.
-    async fn create_project_treasury(
-        &self,
-        key: OrganizationEventKey,
-        project: Project,
-    ) -> Result<()>;
-}
-
-#[async_trait]
-impl OrganizationEventHandler for Processor {
-    async fn create_project_treasury(
+impl Processor {
+    pub(super) async fn create_project_treasury(
         &self,
         key: OrganizationEventKey,
         project: Project,

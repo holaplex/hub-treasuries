@@ -1,48 +1,90 @@
-use hub_core::prelude::*;
+use fireblocks::{objects::transaction::SignatureResponse, Fireblocks};
+use hub_core::{prelude::*, producer::Producer};
 use sea_orm::{prelude::*, DatabaseConnection, JoinType, QueryFilter, QuerySelect, RelationTrait};
 
 use super::{ProcessorError, Result};
-use crate::entities::{sea_orm_active_enums::TxType, treasuries, wallets};
+use crate::{
+    entities::{sea_orm_active_enums::TxType, treasuries, wallets},
+    proto::{treasury_events::Event, TreasuryEventKey, TreasuryEvents},
+};
 
 #[async_trait]
-pub trait Sign<K, P, T> {
+pub trait Sign {
+    type Signature;
+    type Key: Clone + Into<TreasuryEventKey> + Send;
+    type Payload: Send;
+    type Transaction: Clone + Send;
+
     const ASSET_ID: &'static str;
 
-    async fn send_transaction(&self, tx_type: TxType, key: K, payload: P) -> Result<T>;
+    fn producer(&self) -> &Producer<TreasuryEvents>;
+
+    async fn sign_message(
+        &self,
+        note: String,
+        message: Vec<u8>,
+        vault_id: String,
+    ) -> Result<Self::Signature>;
+
+    async fn send_and_notify(
+        &self,
+        ty: TxType,
+        key: Self::Key,
+        txn: Self::Payload,
+        evt: fn(Self::Transaction) -> Event,
+    ) -> Result<Self::Transaction> {
+        let k = key.clone();
+
+        let txn = self.send_transaction(ty, k, txn).await?;
+
+        let t = txn.clone();
+        self.producer()
+            .send(
+                Some(&TreasuryEvents {
+                    event: Some(evt(t)),
+                }),
+                Some(&key.into()),
+            )
+            .await?;
+
+        Ok(txn)
+    }
+
+    async fn send_transaction(
+        &self,
+        tx_type: TxType,
+        key: Self::Key,
+        payload: Self::Payload,
+    ) -> Result<Self::Transaction>;
 }
 
-#[async_trait]
-pub trait Events<K, T> {
-    async fn on_create_drop(&self, key: K, tx: T) -> Result<()>;
-    async fn on_mint_drop(&self, key: K, tx: T) -> Result<()>;
-    async fn on_update_drop(&self, key: K, tx: T) -> Result<()>;
-    async fn on_transfer_asset(&self, key: K, tx: T) -> Result<()>;
-    async fn on_retry_create_drop(&self, key: K, tx: T) -> Result<()>;
-    async fn on_retry_mint_drop(&self, key: K, tx: T) -> Result<()>;
-    async fn on_create_collection(&self, key: K, tx: T) -> Result<()>;
-    async fn on_update_collection(&self, key: K, tx: T) -> Result<()>;
-    async fn on_retry_create_collection(&self, key: K, tx: T) -> Result<()>;
-    async fn on_mint_to_collection(&self, key: K, tx: T) -> Result<()>;
-    async fn on_retry_mint_to_collection(&self, key: K, tx: T) -> Result<()>;
-    async fn on_update_collection_mint(&self, key: K, tx: T) -> Result<()>;
-    async fn on_retry_update_mint(&self, key: K, tx: T) -> Result<()>;
-}
+pub(crate) async fn sign_message<G: Sign>(
+    fireblocks: &Fireblocks,
+    note: String,
+    message: Vec<u8>,
+    vault_id: String,
+) -> Result<SignatureResponse> {
+    let asset_id = fireblocks.assets().id(G::ASSET_ID);
 
-#[async_trait]
-pub trait Transactions<K, P, T>: Sign<K, P, T> + Events<K, T> {
-    async fn create_drop(&self, key: K, payload: P) -> Result<T>;
-    async fn mint_drop(&self, key: K, payload: P) -> Result<T>;
-    async fn update_drop(&self, key: K, payload: P) -> Result<T>;
-    async fn transfer_asset(&self, key: K, payload: P) -> Result<T>;
-    async fn retry_create_drop(&self, key: K, payload: P) -> Result<T>;
-    async fn retry_mint_drop(&self, key: K, payload: P) -> Result<T>;
-    async fn create_collection(&self, key: K, payload: P) -> Result<T>;
-    async fn update_collection(&self, key: K, payload: P) -> Result<T>;
-    async fn retry_create_collection(&self, key: K, payload: P) -> Result<T>;
-    async fn mint_to_collection(&self, key: K, payload: P) -> Result<T>;
-    async fn retry_mint_to_collection(&self, key: K, payload: P) -> Result<T>;
-    async fn update_collection_mint(&self, key: K, payload: P) -> Result<T>;
-    async fn retry_update_collection_mint(&self, key: K, payload: P) -> Result<T>;
+    let transaction = fireblocks
+        .client()
+        .create()
+        .raw_transaction(asset_id, vault_id, message, note)
+        .await
+        .map_err(ProcessorError::Fireblocks)?;
+
+    let details = fireblocks
+        .client()
+        .wait_on_transaction_completion(transaction.id)
+        .await
+        .map_err(ProcessorError::Fireblocks)?;
+
+    Ok(details
+        .signed_messages
+        .get(0)
+        .ok_or(ProcessorError::MissingSignedMessage)?
+        .clone()
+        .signature)
 }
 
 pub(crate) async fn find_vault_id_by_wallet_address(

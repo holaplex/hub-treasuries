@@ -2,13 +2,12 @@
 
 use hub_core::{
     anyhow::{Context as _, Result},
-    serde_json::{self},
-    thiserror,
+    reqwest::{Client as HttpClient, RequestBuilder, Url},
+    serde_json, thiserror,
     tokio::time,
     tracing::info,
 };
 use jsonwebtoken::EncodingKey;
-use reqwest::{Client as HttpClient, RequestBuilder, Url};
 use serde::Serialize;
 
 use crate::{

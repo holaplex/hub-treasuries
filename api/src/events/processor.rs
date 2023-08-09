@@ -6,16 +6,13 @@ use hub_core::{
 };
 use sea_orm::DbErr;
 
-use super::{
-    customer::CustomerEventHandler, organization::OrganizationEventHandler, polygon::Polygon,
-    signer::Transactions, solana::Solana,
-};
+use super::{polygon::Polygon, solana::Solana};
 use crate::{
     db::Connection,
     entities::wallets::TryIntoAssetTypeError,
     proto::{
         customer_events::Event as CustomerEvent, organization_events::Event as OrganizationEvent,
-        solana_nft_events::Event as SolanaNftEvent, TreasuryEvents,
+        TreasuryEvents,
     },
     Services,
 };
@@ -108,56 +105,7 @@ impl Processor {
                 Some(_) | None => Ok(()),
             },
             Services::Polygon(key, e) => self.polygon().process(key, e).await,
-            Services::Solana(key, e) => {
-                let solana = self.solana();
-
-                match e.event {
-                    Some(SolanaNftEvent::CreateDropSigningRequested(payload)) => {
-                        solana.create_drop(key.clone(), payload).await?;
-                    },
-                    Some(SolanaNftEvent::UpdateDropSigningRequested(payload)) => {
-                        solana.update_drop(key.clone(), payload).await?;
-                    },
-                    Some(SolanaNftEvent::MintDropSigningRequested(payload)) => {
-                        solana.mint_drop(key.clone(), payload).await?;
-                    },
-                    Some(SolanaNftEvent::TransferAssetSigningRequested(payload)) => {
-                        solana.transfer_asset(key.clone(), payload).await?;
-                    },
-                    Some(SolanaNftEvent::RetryCreateDropSigningRequested(payload)) => {
-                        solana.retry_create_drop(key.clone(), payload).await?;
-                    },
-                    Some(SolanaNftEvent::RetryMintDropSigningRequested(payload)) => {
-                        solana.retry_mint_drop(key.clone(), payload).await?;
-                    },
-                    Some(SolanaNftEvent::CreateCollectionSigningRequested(payload)) => {
-                        solana.create_collection(key.clone(), payload).await?;
-                    },
-                    Some(SolanaNftEvent::UpdateCollectionSigningRequested(payload)) => {
-                        solana.update_collection(key.clone(), payload).await?;
-                    },
-                    Some(SolanaNftEvent::RetryCreateCollectionSigningRequested(payload)) => {
-                        solana.retry_create_collection(key.clone(), payload).await?;
-                    },
-                    Some(SolanaNftEvent::MintToCollectionSigningRequested(payload)) => {
-                        solana.mint_to_collection(key.clone(), payload).await?;
-                    },
-                    Some(SolanaNftEvent::RetryMintToCollectionSigningRequested(payload)) => {
-                        solana
-                            .retry_mint_to_collection(key.clone(), payload)
-                            .await?;
-                    },
-                    Some(SolanaNftEvent::UpdateCollectionMintSigningRequested(payload)) => {
-                        solana.update_collection_mint(key.clone(), payload).await?;
-                    },
-                    Some(SolanaNftEvent::RetryUpdateMintSigningRequested(payload)) => {
-                        solana.update_collection_mint(key.clone(), payload).await?;
-                    },
-                    _ => (),
-                };
-
-                Ok(())
-            },
+            Services::Solana(key, e) => self.solana().process(key, e).await,
         }
     }
 

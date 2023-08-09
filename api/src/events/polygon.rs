@@ -2,7 +2,7 @@ use fireblocks::{objects::transaction::SignatureResponse, Fireblocks};
 use hub_core::{prelude::*, producer::Producer};
 
 use super::{
-    signer::{find_vault_id_by_wallet_address, Events, Sign, Transactions},
+    signer::{find_vault_id_by_wallet_address, sign_message, Sign},
     EcdsaSignatureScalar, ProcessorError, Result,
 };
 use crate::{
@@ -38,76 +38,56 @@ impl Polygon {
     pub async fn process(&self, key: PolygonNftEventKey, e: PolygonNftEvents) -> Result<()> {
         match e.event {
             Some(PolygonNftEvent::SubmitCreateDropTxn(payload)) => {
-                self.create_drop(key.clone(), payload).await?;
+                self.send_and_notify(
+                    TxType::CreateDrop,
+                    key,
+                    payload,
+                    Event::PolygonCreateDropTxnSubmitted,
+                )
+                .await?;
             },
             Some(PolygonNftEvent::SubmitRetryCreateDropTxn(payload)) => {
-                self.retry_create_drop(key.clone(), payload).await?;
+                self.send_and_notify(
+                    TxType::CreateDrop,
+                    key,
+                    payload,
+                    Event::PolygonRetryCreateDropSubmitted,
+                )
+                .await?;
             },
             Some(PolygonNftEvent::SubmitMintDropTxn(payload)) => {
-                self.mint_drop(key.clone(), payload).await?;
+                self.send_and_notify(
+                    TxType::MintEdition,
+                    key,
+                    payload,
+                    Event::PolygonMintDropSubmitted,
+                )
+                .await?;
             },
             Some(PolygonNftEvent::SubmitUpdateDropTxn(payload)) => {
-                self.update_drop(key.clone(), payload).await?;
+                self.send_and_notify(
+                    TxType::UpdateMetadata,
+                    key,
+                    payload,
+                    Event::PolygonUpdateDropSubmitted,
+                )
+                .await?;
             },
 
             Some(PolygonNftEvent::SubmitRetryMintDropTxn(payload)) => {
-                self.retry_mint_drop(key.clone(), payload).await?;
+                self.send_and_notify(
+                    TxType::MintEdition,
+                    key,
+                    payload,
+                    Event::PolygonRetryMintDropSubmitted,
+                )
+                .await?;
             },
-            Some(PolygonNftEvent::SignPermitTokenTransferHash(PermitArgsHash {
-                data,
-                owner,
-                spender,
-                recipient,
-                edition_id,
-                amount,
-            })) => {
-                let vault_id =
-                    find_vault_id_by_wallet_address(self.db.get(), owner.clone()).await?;
-                let signature = self.sign_message(data, vault_id).await?;
-
-                let (r, s, v) = (
-                    hex::decode(signature.r.ok_or(ProcessorError::IncompleteEcdsaSignature(
-                        EcdsaSignatureScalar::R,
-                    ))?)?,
-                    hex::decode(signature.s.ok_or(ProcessorError::IncompleteEcdsaSignature(
-                        EcdsaSignatureScalar::S,
-                    ))?)?,
-                    (signature.v.ok_or(ProcessorError::IncompleteEcdsaSignature(
-                        EcdsaSignatureScalar::V,
-                    ))? + 27)
-                        .try_into()
-                        .map_err(ProcessorError::InvalidEcdsaPubkeyRecovery)?,
-                );
-
-                let event = TreasuryEvents {
-                    event: Some(Event::PolygonPermitTransferTokenHashSigned(
-                        PolygonPermitHashSignature {
-                            signature: Some(EcdsaSignature { r, s, v }),
-                            owner,
-                            spender,
-                            recipient,
-                            edition_id,
-                            amount,
-                        },
-                    )),
-                };
-
-                self.producer.send(Some(&event), Some(&key.into())).await?;
+            Some(PolygonNftEvent::SignPermitTokenTransferHash(payload)) => {
+                self.sign_permit_token_transfer_hash(key, payload).await?;
             },
             Some(PolygonNftEvent::SubmitTransferAssetTxns(payload)) => {
-                let PolygonTokenTransferTxns {
-                    permit_token_transfer_txn,
-                    safe_transfer_from_txn,
-                } = payload;
-                let permit_txn_data = permit_token_transfer_txn
-                    .ok_or(ProcessorError::MissingPermitTokenTransferTxn)?;
-                let safe_txn_data =
-                    safe_transfer_from_txn.ok_or(ProcessorError::MissingSafeTransferFromTxn)?;
-
-                self.send_transaction(TxType::TransferMint, key.clone(), permit_txn_data)
-                    .await?;
-
-                self.transfer_asset(key, safe_txn_data).await?;
+                self.submit_transfer_asset_txns(key, payload).await?;
             },
             Some(PolygonNftEvent::UpdateMintsOwner(_)) | None => (),
         }
@@ -115,183 +95,105 @@ impl Polygon {
         Ok(())
     }
 
-    pub async fn sign_message(
+    async fn sign_permit_token_transfer_hash(
         &self,
+        key: PolygonNftEventKey,
+        payload: PermitArgsHash,
+    ) -> Result<()> {
+        let PermitArgsHash {
+            data,
+            owner,
+            spender,
+            recipient,
+            edition_id,
+            amount,
+        } = payload;
+
+        let vault_id = find_vault_id_by_wallet_address(self.db.get(), owner.clone()).await?;
+        let signature = self.sign_message(String::new(), data, vault_id).await?;
+
+        let (r, s, v) = (
+            hex::decode(signature.r.ok_or(ProcessorError::IncompleteEcdsaSignature(
+                EcdsaSignatureScalar::R,
+            ))?)?,
+            hex::decode(signature.s.ok_or(ProcessorError::IncompleteEcdsaSignature(
+                EcdsaSignatureScalar::S,
+            ))?)?,
+            (signature.v.ok_or(ProcessorError::IncompleteEcdsaSignature(
+                EcdsaSignatureScalar::V,
+            ))? + 27)
+                .try_into()
+                .map_err(ProcessorError::InvalidEcdsaPubkeyRecovery)?,
+        );
+
+        let event = TreasuryEvents {
+            event: Some(Event::PolygonPermitTransferTokenHashSigned(
+                PolygonPermitHashSignature {
+                    signature: Some(EcdsaSignature { r, s, v }),
+                    owner,
+                    spender,
+                    recipient,
+                    edition_id,
+                    amount,
+                },
+            )),
+        };
+
+        self.producer
+            .send(Some(&event), Some(&key.into()))
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn submit_transfer_asset_txns(
+        &self,
+        key: PolygonNftEventKey,
+        payload: PolygonTokenTransferTxns,
+    ) -> Result<PolygonTransactionResult> {
+        let PolygonTokenTransferTxns {
+            permit_token_transfer_txn,
+            safe_transfer_from_txn,
+        } = payload;
+        let permit_txn_data =
+            permit_token_transfer_txn.ok_or(ProcessorError::MissingPermitTokenTransferTxn)?;
+        let safe_txn_data =
+            safe_transfer_from_txn.ok_or(ProcessorError::MissingSafeTransferFromTxn)?;
+
+        self.send_transaction(TxType::TransferMint, key.clone(), permit_txn_data)
+            .await?;
+
+        self.send_and_notify(
+            TxType::TransferMint,
+            key,
+            safe_txn_data,
+            Event::PolygonTransferAssetSubmitted,
+        )
+        .await
+    }
+}
+
+#[async_trait]
+impl Sign for Polygon {
+    type Key = PolygonNftEventKey;
+    type Payload = PolygonTransaction;
+    type Signature = SignatureResponse;
+    type Transaction = PolygonTransactionResult;
+
+    const ASSET_ID: &'static str = "MATIC";
+
+    #[inline]
+    fn producer(&self) -> &Producer<TreasuryEvents> {
+        &self.producer
+    }
+
+    async fn sign_message(
+        &self,
+        note: String,
         message: Vec<u8>,
         vault_id: String,
     ) -> Result<SignatureResponse> {
-        let asset_id = self.fireblocks.assets().id(Self::ASSET_ID);
-
-        let transaction = self
-            .fireblocks
-            .client()
-            .create()
-            .raw_transaction(asset_id, vault_id, message, String::new())
-            .await
-            .map_err(ProcessorError::Fireblocks)?;
-
-        let details = self
-            .fireblocks
-            .client()
-            .wait_on_transaction_completion(transaction.id)
-            .await
-            .map_err(ProcessorError::Fireblocks)?;
-
-        let signature = details
-            .signed_messages
-            .get(0)
-            .ok_or(ProcessorError::MissingSignedMessage)?
-            .clone()
-            .signature;
-
-        Ok(signature)
+        sign_message::<Self>(&self.fireblocks, note, message, vault_id).await
     }
-}
-
-#[async_trait]
-impl Transactions<PolygonNftEventKey, PolygonTransaction, PolygonTransactionResult> for Polygon {
-    async fn create_drop(
-        &self,
-        key: PolygonNftEventKey,
-        payload: PolygonTransaction,
-    ) -> Result<PolygonTransactionResult> {
-        let tx = self
-            .send_transaction(TxType::CreateDrop, key.clone(), payload)
-            .await?;
-        self.on_create_drop(key, tx.clone()).await?;
-
-        Ok(tx)
-    }
-
-    async fn create_collection(
-        &self,
-        _key: PolygonNftEventKey,
-        _payload: PolygonTransaction,
-    ) -> Result<PolygonTransactionResult> {
-        unreachable!()
-    }
-
-    async fn update_drop(
-        &self,
-        key: PolygonNftEventKey,
-        payload: PolygonTransaction,
-    ) -> Result<PolygonTransactionResult> {
-        let tx = self
-            .send_transaction(TxType::UpdateMetadata, key.clone(), payload)
-            .await?;
-
-        self.on_update_drop(key, tx.clone()).await?;
-
-        Ok(tx)
-    }
-
-    async fn update_collection(
-        &self,
-        _key: PolygonNftEventKey,
-        _payload: PolygonTransaction,
-    ) -> Result<PolygonTransactionResult> {
-        unreachable!()
-    }
-
-    async fn mint_to_collection(
-        &self,
-        _key: PolygonNftEventKey,
-        _payload: PolygonTransaction,
-    ) -> Result<PolygonTransactionResult> {
-        unreachable!()
-    }
-
-    async fn retry_mint_to_collection(
-        &self,
-        _key: PolygonNftEventKey,
-        _payload: PolygonTransaction,
-    ) -> Result<PolygonTransactionResult> {
-        unreachable!()
-    }
-
-    async fn mint_drop(
-        &self,
-        key: PolygonNftEventKey,
-        payload: PolygonTransaction,
-    ) -> Result<PolygonTransactionResult> {
-        let tx = self
-            .send_transaction(TxType::MintEdition, key.clone(), payload)
-            .await?;
-
-        self.on_mint_drop(key, tx.clone()).await?;
-
-        Ok(tx)
-    }
-
-    async fn transfer_asset(
-        &self,
-        key: PolygonNftEventKey,
-        payload: PolygonTransaction,
-    ) -> Result<PolygonTransactionResult> {
-        let tx = self
-            .send_transaction(TxType::TransferMint, key.clone(), payload)
-            .await?;
-
-        self.on_transfer_asset(key, tx.clone()).await?;
-
-        Ok(tx)
-    }
-
-    async fn retry_create_drop(
-        &self,
-        key: PolygonNftEventKey,
-        payload: PolygonTransaction,
-    ) -> Result<PolygonTransactionResult> {
-        let tx = self
-            .send_transaction(TxType::CreateDrop, key.clone(), payload)
-            .await?;
-        self.on_retry_create_drop(key, tx.clone()).await?;
-
-        Ok(tx)
-    }
-
-    async fn retry_create_collection(
-        &self,
-        _key: PolygonNftEventKey,
-        _payload: PolygonTransaction,
-    ) -> Result<PolygonTransactionResult> {
-        unreachable!()
-    }
-
-    async fn retry_mint_drop(
-        &self,
-        key: PolygonNftEventKey,
-        payload: PolygonTransaction,
-    ) -> Result<PolygonTransactionResult> {
-        let tx = self
-            .send_transaction(TxType::MintEdition, key.clone(), payload)
-            .await?;
-
-        self.on_retry_mint_drop(key, tx.clone()).await?;
-
-        Ok(tx)
-    }
-
-    async fn update_collection_mint(
-        &self,
-        _key: PolygonNftEventKey,
-        _payload: PolygonTransaction,
-    ) -> Result<PolygonTransactionResult> {
-        unreachable!()
-    }
-
-    async fn retry_update_collection_mint(
-        &self,
-        _key: PolygonNftEventKey,
-        _payload: PolygonTransaction,
-    ) -> Result<PolygonTransactionResult> {
-        unreachable!()
-    }
-}
-
-#[async_trait]
-impl Sign<PolygonNftEventKey, PolygonTransaction, PolygonTransactionResult> for Polygon {
-    const ASSET_ID: &'static str = "MATIC";
 
     async fn send_transaction(
         &self,
@@ -301,7 +203,7 @@ impl Sign<PolygonNftEventKey, PolygonTransaction, PolygonTransactionResult> for 
     ) -> Result<PolygonTransactionResult> {
         let note = format!(
             "{:?} by {:?} for project {:?}",
-            tx_type, key.user_id, key.project_id
+            tx_type, key.user_id, key.project_id,
         );
         let vault = self.fireblocks.treasury_vault();
         let asset_id = self.fireblocks.assets().id(Self::ASSET_ID);
@@ -330,149 +232,6 @@ impl Sign<PolygonNftEventKey, PolygonTransaction, PolygonTransactionResult> for 
             contract_address: payload.contract_address,
             edition_id: payload.edition_id,
         })
-    }
-}
-
-#[async_trait]
-impl Events<PolygonNftEventKey, PolygonTransactionResult> for Polygon {
-    async fn on_create_drop(
-        &self,
-        key: PolygonNftEventKey,
-        tx: PolygonTransactionResult,
-    ) -> Result<()> {
-        let event = TreasuryEvents {
-            event: Some(Event::PolygonCreateDropTxnSubmitted(tx)),
-        };
-
-        self.producer.send(Some(&event), Some(&key.into())).await?;
-
-        Ok(())
-    }
-
-    async fn on_create_collection(
-        &self,
-        _key: PolygonNftEventKey,
-        _tx: PolygonTransactionResult,
-    ) -> Result<()> {
-        unreachable!()
-    }
-
-    async fn on_mint_drop(
-        &self,
-        key: PolygonNftEventKey,
-        tx: PolygonTransactionResult,
-    ) -> Result<()> {
-        let event = TreasuryEvents {
-            event: Some(Event::PolygonMintDropSubmitted(tx)),
-        };
-
-        self.producer.send(Some(&event), Some(&key.into())).await?;
-
-        Ok(())
-    }
-
-    async fn on_retry_create_drop(
-        &self,
-        key: PolygonNftEventKey,
-        tx: PolygonTransactionResult,
-    ) -> Result<()> {
-        let event = TreasuryEvents {
-            event: Some(Event::PolygonRetryCreateDropSubmitted(tx)),
-        };
-
-        self.producer.send(Some(&event), Some(&key.into())).await?;
-
-        Ok(())
-    }
-
-    async fn on_retry_create_collection(
-        &self,
-        _key: PolygonNftEventKey,
-        _tx: PolygonTransactionResult,
-    ) -> Result<()> {
-        unreachable!()
-    }
-
-    async fn on_mint_to_collection(
-        &self,
-        _key: PolygonNftEventKey,
-        _tx: PolygonTransactionResult,
-    ) -> Result<()> {
-        unreachable!()
-    }
-
-    async fn on_retry_mint_to_collection(
-        &self,
-        _key: PolygonNftEventKey,
-        _tx: PolygonTransactionResult,
-    ) -> Result<()> {
-        unreachable!()
-    }
-
-    async fn on_retry_mint_drop(
-        &self,
-        key: PolygonNftEventKey,
-        tx: PolygonTransactionResult,
-    ) -> Result<()> {
-        let event = TreasuryEvents {
-            event: Some(Event::PolygonRetryMintDropSubmitted(tx)),
-        };
-
-        self.producer.send(Some(&event), Some(&key.into())).await?;
-
-        Ok(())
-    }
-
-    async fn on_update_drop(
-        &self,
-        key: PolygonNftEventKey,
-        tx: PolygonTransactionResult,
-    ) -> Result<()> {
-        let event = TreasuryEvents {
-            event: Some(Event::PolygonUpdateDropSubmitted(tx)),
-        };
-
-        self.producer.send(Some(&event), Some(&key.into())).await?;
-
-        Ok(())
-    }
-
-    async fn on_update_collection(
-        &self,
-        _key: PolygonNftEventKey,
-        _tx: PolygonTransactionResult,
-    ) -> Result<()> {
-        unreachable!()
-    }
-
-    async fn on_transfer_asset(
-        &self,
-        key: PolygonNftEventKey,
-        tx: PolygonTransactionResult,
-    ) -> Result<()> {
-        let event = TreasuryEvents {
-            event: Some(Event::PolygonTransferAssetSubmitted(tx)),
-        };
-
-        self.producer.send(Some(&event), Some(&key.into())).await?;
-
-        Ok(())
-    }
-
-    async fn on_update_collection_mint(
-        &self,
-        _key: PolygonNftEventKey,
-        _tx: PolygonTransactionResult,
-    ) -> Result<()> {
-        unreachable!()
-    }
-
-    async fn on_retry_update_mint(
-        &self,
-        _key: PolygonNftEventKey,
-        _tx: PolygonTransactionResult,
-    ) -> Result<()> {
-        unreachable!()
     }
 }
 

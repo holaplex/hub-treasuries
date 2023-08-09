@@ -12,29 +12,12 @@ use crate::{
     },
 };
 
-#[async_trait]
-pub trait CustomerEventHandler {
-    /// Creates a customer treasury in the Fireblocks system and records the treasury details in the local database.
-    ///
-    /// # Arguments
-    /// * conn - A database connection object.
-    /// * fireblocks - A Fireblocks client object.
-    /// * producer - A Kafka producer object for sending events.
-    /// * key - The customer event key.
-    /// * customer - The customer details.
-    ///
-    /// # Errors
-    /// This function may return an error in the following cases:
-    /// * Failed to create the vault in Fireblocks.
-    /// * Failed to insert the treasury record in the local database.
-    /// * Failed to parse the customer ID to a UUID.
-    /// * Failed to insert the customer treasuries record in the local database.
-    async fn create_treasury(&self, key: CustomerEventKey, customer: Customer) -> Result<()>;
-}
-
-#[async_trait]
-impl CustomerEventHandler for Processor {
-    async fn create_treasury(&self, key: CustomerEventKey, customer: Customer) -> Result<()> {
+impl Processor {
+    pub(super) async fn create_treasury(
+        &self,
+        key: CustomerEventKey,
+        customer: Customer,
+    ) -> Result<()> {
         let conn = self.db.get();
         let create_vault = CreateVault {
             name: format!("customer:{}", key.id.clone()),
