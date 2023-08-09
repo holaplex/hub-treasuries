@@ -2,7 +2,10 @@ use std::str::FromStr;
 
 use async_graphql::{Enum, Result, SimpleObject};
 use fireblocks::assets::{ETH, ETH_TEST, MATIC, MATIC_POLYGON, MATIC_TEST, SOL, SOL_TEST};
-use hub_core::anyhow::{anyhow, Error};
+use hub_core::{
+    anyhow::{anyhow, Error},
+    credits::Blockchain,
+};
 use sea_orm::entity::prelude::*;
 
 /// Fireblocks-defined blockchain identifiers.
@@ -29,6 +32,16 @@ impl AssetType {
             Self::Solana => SOL,
             Self::Matic => MATIC,
             Self::Eth => ETH,
+        }
+    }
+}
+
+impl From<AssetType> for Blockchain {
+    fn from(value: AssetType) -> Self {
+        match value {
+            AssetType::Solana => Blockchain::Solana,
+            AssetType::Matic => Blockchain::Polygon,
+            AssetType::Eth => Blockchain::Ethereum,
         }
     }
 }
