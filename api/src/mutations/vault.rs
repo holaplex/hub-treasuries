@@ -89,17 +89,7 @@ impl Mutation {
                 asset_type.into(),
                 balance,
             )
-            .await
-            .map_err(|e| match e.kind() {
-                DeductionErrorKind::InsufficientBalance { available, cost } => Error::new(format!(
-                    "insufficient balance: available: {available}, cost: {cost}"
-                )),
-                DeductionErrorKind::MissingItem => Error::new("action not supported at this time"),
-                DeductionErrorKind::InvalidCost(_) => Error::new("invalid cost"),
-                DeductionErrorKind::Send(_) => {
-                    Error::new("unable to send credit deduction request")
-                },
-            })?;
+            .await?;
 
         let vault_asset = fireblocks
             .client()
