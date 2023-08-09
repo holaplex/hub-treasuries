@@ -7,11 +7,7 @@ use holaplex_hub_treasuries::{
     handlers::{graphql_handler, health, playground},
     proto, Actions, AppState, Args, Services,
 };
-use hub_core::{
-    anyhow::Context as AnyhowContext,
-    prelude::*,
-    tokio::{self, task},
-};
+use hub_core::{anyhow::Context as AnyhowContext, prelude::*, tokio};
 use poem::{get, listener::TcpListener, middleware::AddData, post, EndpointExt, Route, Server};
 
 pub fn main() {
@@ -50,25 +46,15 @@ pub fn main() {
             let cons = common.consumer_cfg.build::<Services>().await?;
 
             tokio::spawn(async move {
-                {
-                    let mut stream = cons.stream();
-                    loop {
-                        let event_processor = event_processor.clone();
-
-                        match stream.next().await {
-                            Some(Ok(msg)) => {
-                                info!(?msg, "message received");
-
-                                tokio::spawn(async move { event_processor.process(msg).await });
-                                task::yield_now().await;
-                            },
-                            None => (),
-                            Some(Err(e)) => {
-                                warn!("failed to get message {:?}", e);
-                            },
-                        }
-                    }
-                }
+                cons.consume(
+                    |b| {
+                        b.with_jitter()
+                            .with_min_delay(Duration::from_millis(500))
+                            .with_max_delay(Duration::from_secs(90))
+                    },
+                    |e| async move { event_processor.process(e).await },
+                )
+                .await
             });
 
             Server::new(TcpListener::bind(format!("0.0.0.0:{port}")))

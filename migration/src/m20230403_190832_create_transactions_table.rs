@@ -76,7 +76,7 @@ pub enum TxType {
 
 impl Iden for TxType {
     fn unquoted(&self, s: &mut dyn std::fmt::Write) {
-        write!(s, "{}", match self {
+        s.write_str(match self {
             Self::Type => "tx_type",
             Self::CreateDrop => "create_drop",
             Self::MintEdition => "mint_edition",

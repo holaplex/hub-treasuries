@@ -1,7 +1,10 @@
 use fireblocks::{objects::transaction::SignatureResponse, Fireblocks};
 use hub_core::{prelude::*, producer::Producer};
 
-use super::signer::{find_vault_id_by_wallet_address, Events, Sign, Transactions};
+use super::{
+    signer::{find_vault_id_by_wallet_address, Events, Sign, Transactions},
+    EcdsaSignatureScalar, ProcessorError, Result,
+};
 use crate::{
     db::Connection,
     entities::sea_orm_active_enums::TxType,
@@ -63,21 +66,17 @@ impl Polygon {
                 let signature = self.sign_message(data, vault_id).await?;
 
                 let (r, s, v) = (
-                    hex::decode(
-                        signature
-                            .r
-                            .context("r component of ECDA Signature not found")?,
-                    )?,
-                    hex::decode(
-                        signature
-                            .s
-                            .context("s component of ECDA Signature not found")?,
-                    )?,
-                    (signature
-                        .v
-                        .context("v component of ECDA Signature not found")?
-                        + 27)
-                        .try_into()?,
+                    hex::decode(signature.r.ok_or(ProcessorError::IncompleteEcdsaSignature(
+                        EcdsaSignatureScalar::R,
+                    ))?)?,
+                    hex::decode(signature.s.ok_or(ProcessorError::IncompleteEcdsaSignature(
+                        EcdsaSignatureScalar::S,
+                    ))?)?,
+                    (signature.v.ok_or(ProcessorError::IncompleteEcdsaSignature(
+                        EcdsaSignatureScalar::V,
+                    ))? + 27)
+                        .try_into()
+                        .map_err(ProcessorError::InvalidEcdsaPubkeyRecovery)?,
                 );
 
                 let event = TreasuryEvents {
@@ -100,10 +99,10 @@ impl Polygon {
                     permit_token_transfer_txn,
                     safe_transfer_from_txn,
                 } = payload;
-                let permit_txn_data =
-                    permit_token_transfer_txn.context("permit_token_transfer_txn not found")?;
+                let permit_txn_data = permit_token_transfer_txn
+                    .ok_or(ProcessorError::MissingPermitTokenTransferTxn)?;
                 let safe_txn_data =
-                    safe_transfer_from_txn.context("safe_transfer_from_txn not found")?;
+                    safe_transfer_from_txn.ok_or(ProcessorError::MissingSafeTransferFromTxn)?;
 
                 self.send_transaction(TxType::TransferMint, key.clone(), permit_txn_data)
                     .await?;
@@ -128,18 +127,20 @@ impl Polygon {
             .client()
             .create()
             .raw_transaction(asset_id, vault_id, message, String::new())
-            .await?;
+            .await
+            .map_err(ProcessorError::Fireblocks)?;
 
         let details = self
             .fireblocks
             .client()
             .wait_on_transaction_completion(transaction.id)
-            .await?;
+            .await
+            .map_err(ProcessorError::Fireblocks)?;
 
         let signature = details
             .signed_messages
             .get(0)
-            .context("no signed message found")?
+            .ok_or(ProcessorError::MissingSignedMessage)?
             .clone()
             .signature;
 
@@ -310,7 +311,8 @@ impl Sign<PolygonNftEventKey, PolygonTransaction, PolygonTransactionResult> for 
             .client()
             .create()
             .contract_call(payload.data, asset_id, vault, note)
-            .await?;
+            .await
+            .map_err(ProcessorError::Fireblocks)?;
 
         let (hash, status) = self
             .fireblocks

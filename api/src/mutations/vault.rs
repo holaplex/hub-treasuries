@@ -143,6 +143,113 @@ impl Mutation {
     }
 }
 
+/// Checks if the wallet already exists for the given treasury and asset type.
+/// Returns the ID of an existing wallet  entry if it exists for the given treasury and asset type.
+/// Otherwise, it generates a new pending deduction ID using the `CreditsClient`
+/// and creates a new entry in the wallets table, returning its ID.
+/// #Errors
+/// May return an error if there is an issue with querying or inserting data, or if the asset type is not supported.
+async fn submit_pending_deduction(
+    credits: &CreditsClient<Actions>,
+    db: &Connection,
+    params: DeductionParams,
+) -> Result<Uuid> {
+    let DeductionParams {
+        balance,
+        user_id,
+        customer,
+        org_id,
+        treasury,
+        asset_type,
+    } = params;
+
+    let wallet = Wallets::find()
+        .filter(
+            wallets::Column::TreasuryId
+                .eq(treasury)
+                .and(wallets::Column::AssetId.eq(asset_type)),
+        )
+        .one(db.get())
+        .await?;
+
+    if let Some(wallet) = wallet {
+        match (wallet.address, wallet.deduction_id) {
+            (Some(_), _) => {
+                return Err(Error::new(format!(
+                    "wallet already exists for customer {customer} and asset type {asset_type} "
+                )));
+            },
+            (_, Some(deduction_id)) => {
+                return Ok(deduction_id);
+            },
+            _ => {},
+        }
+    }
+
+    let id = match asset_type {
+        AssetType::Solana => {
+            credits
+                .submit_pending_deduction(
+                    org_id,
+                    user_id,
+                    Actions::CreateWallet,
+                    hub_core::credits::Blockchain::Solana,
+                    balance,
+                )
+                .await?
+        },
+        AssetType::Matic => {
+            credits
+                .submit_pending_deduction(
+                    org_id,
+                    user_id,
+                    Actions::CreateWallet,
+                    hub_core::credits::Blockchain::Polygon,
+                    balance,
+                )
+                .await?
+        },
+        AssetType::Eth => {
+            return Err(Error::new("ethereum not supported yet"));
+        },
+    };
+
+    let wallet_model = wallets::ActiveModel {
+        treasury_id: Set(treasury),
+        address: Set(None),
+        created_at: Set(Utc::now().into()),
+        removed_at: Set(None),
+        created_by: Set(user_id),
+        asset_id: Set(asset_type),
+        deduction_id: Set(Some(id.0)),
+        ..Default::default()
+    };
+    wallet_model.insert(db.get()).await?;
+
+    Ok(id.0)
+}
+
+/// Updates the address of the wallet record with the specified UUID
+/// # Errors
+/// Fails if the wallet is not found or fails to update the record.
+async fn update_wallet_address(
+    db: &Connection,
+    address: String,
+    deduction_id: Uuid,
+) -> Result<wallets::Model> {
+    let wallet_model = Wallets::find()
+        .filter(wallets::Column::DeductionId.eq(deduction_id))
+        .one(db.get())
+        .await?
+        .ok_or(Error::new("wallet not found"))?;
+
+    let mut wallet_am: wallets::ActiveModel = wallet_model.into();
+    wallet_am.address = Set(Some(address));
+    let wallet = wallet_am.update(db.get()).await?;
+
+    Ok(wallet)
+}
+
 /// Input for creating a customer wallet.
 #[derive(InputObject, Clone, Debug)]
 pub struct CreateCustomerWalletInput {

@@ -4,7 +4,10 @@ use hex::FromHex;
 use hub_core::{prelude::*, producer::Producer};
 use solana_sdk::pubkey::Pubkey;
 
-use super::signer::{find_vault_id_by_wallet_address, Events, Sign, Transactions};
+use super::{
+    signer::{find_vault_id_by_wallet_address, Events, Sign, Transactions},
+    ProcessorError, Result,
+};
 use crate::{
     db::Connection,
     entities::sea_orm_active_enums::TxType,
@@ -47,17 +50,19 @@ impl Solana {
             .client()
             .create()
             .raw_transaction(asset_id, vault_id, message, note)
-            .await?;
+            .await
+            .map_err(ProcessorError::Fireblocks)?;
 
         let transaction_details = fireblocks
             .client()
             .wait_on_transaction_completion(transaction.id)
-            .await?;
+            .await
+            .map_err(ProcessorError::Fireblocks)?;
 
         let full_sig = transaction_details
             .signed_messages
             .get(0)
-            .context("failed to get signed message response")?
+            .ok_or(ProcessorError::MissingSignedMessage)?
             .clone()
             .signature
             .full_sig;
@@ -277,7 +282,7 @@ impl Sign<SolanaNftEventKey, SolanaPendingTransaction, SolanaTransactionResult> 
             if Self::is_public_key(&req_sig) {
                 let vault_id = find_vault_id_by_wallet_address(conn, req_sig).await?;
 
-                let fireblocks_request: BoxFuture<Result<String, Error>> =
+                let fireblocks_request: BoxFuture<Result<String>> =
                     Box::pin(Self::request_and_wait_signature_from_fireblocks(
                         &self.fireblocks,
                         note.clone(),

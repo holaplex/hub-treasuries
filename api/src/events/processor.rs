@@ -1,5 +1,10 @@
 use fireblocks::Fireblocks;
-use hub_core::{prelude::*, producer::Producer};
+use hub_core::{
+    prelude::*,
+    producer::{Producer, SendError},
+    thiserror, uuid,
+};
+use sea_orm::DbErr;
 
 use super::{
     customer::CustomerEventHandler, organization::OrganizationEventHandler, polygon::Polygon,
@@ -7,12 +12,67 @@ use super::{
 };
 use crate::{
     db::Connection,
+    entities::wallets::TryIntoAssetTypeError,
     proto::{
         customer_events::Event as CustomerEvent, organization_events::Event as OrganizationEvent,
         solana_nft_events::Event as SolanaNftEvent, TreasuryEvents,
     },
     Services,
 };
+
+#[derive(Debug, Clone, Copy)]
+pub enum EcdsaSignatureScalar {
+    R,
+    S,
+    V,
+}
+
+impl fmt::Display for EcdsaSignatureScalar {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::R => "r",
+            Self::S => "s",
+            Self::V => "v",
+        })
+    }
+}
+
+#[derive(Debug, thiserror::Error, Triage)]
+pub enum ProcessorError {
+    #[error("No treasury found for wallet address {0:?}")]
+    InvalidWalletAddress(String),
+    #[error("Invalid blockchain {0:?}")]
+    InvalidBlockchain(String),
+    #[error("Missing {0} scalar of ECDSA signature")]
+    IncompleteEcdsaSignature(EcdsaSignatureScalar),
+    #[error("Field permit_token_transfer_txn not found in event payload")]
+    MissingPermitTokenTransferTxn,
+    #[error("Field safe_transfer_from_txn not found in event payload")]
+    MissingSafeTransferFromTxn,
+    #[error("Signed message not found in transaction response")]
+    MissingSignedMessage,
+
+    #[error("Invalid ECDSA pubkey recovery scalar")]
+    #[permanent]
+    InvalidEcdsaPubkeyRecovery(#[source] std::num::TryFromIntError),
+    #[error("Fireblocks error")]
+    #[transient]
+    Fireblocks(#[source] Error),
+    #[error("Invalid UUID")]
+    InvalidUuid(#[from] uuid::Error),
+    #[error("Invalid hex string")]
+    #[permanent]
+    InvalidHex(#[from] hex::FromHexError),
+    #[error("Invalid asset type")]
+    #[permanent]
+    InvalidAssetType(#[from] TryIntoAssetTypeError),
+    #[error("Database error")]
+    DbError(#[from] DbErr),
+    #[error("Error sending message")]
+    SendError(#[from] SendError),
+}
+
+pub type Result<T> = std::result::Result<T, ProcessorError>;
 
 #[derive(Clone)]
 pub struct Processor {
@@ -38,16 +98,12 @@ impl Processor {
         // match topics
         match msg {
             Services::Customers(key, e) => match e.event {
-                Some(CustomerEvent::Created(customer)) => {
-                    self.customer().create_treasury(key, customer).await
-                },
+                Some(CustomerEvent::Created(customer)) => self.create_treasury(key, customer).await,
                 Some(_) | None => Ok(()),
             },
             Services::Organizations(key, e) => match e.event {
                 Some(OrganizationEvent::ProjectCreated(project)) => {
-                    self.organization()
-                        .create_project_treasury(key, project)
-                        .await
+                    self.create_project_treasury(key, project).await
                 },
                 Some(_) | None => Ok(()),
             },
@@ -103,14 +159,6 @@ impl Processor {
                 Ok(())
             },
         }
-    }
-
-    fn customer(&self) -> impl CustomerEventHandler {
-        self.clone()
-    }
-
-    fn organization(&self) -> impl OrganizationEventHandler {
-        self.clone()
     }
 
     fn solana(&self) -> Solana {

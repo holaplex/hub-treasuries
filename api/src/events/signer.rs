@@ -1,6 +1,7 @@
 use hub_core::prelude::*;
 use sea_orm::{prelude::*, DatabaseConnection, JoinType, QueryFilter, QuerySelect, RelationTrait};
 
+use super::{ProcessorError, Result};
 use crate::entities::{sea_orm_active_enums::TxType, treasuries, wallets};
 
 #[async_trait]
@@ -53,10 +54,7 @@ pub(crate) async fn find_vault_id_by_wallet_address(
         .filter(wallets::Column::Address.eq(wallet_address.clone()))
         .one(db)
         .await?
-        .ok_or(anyhow!(
-            "no treasury found for wallet address {}",
-            wallet_address
-        ))?;
+        .ok_or_else(|| ProcessorError::InvalidWalletAddress(wallet_address))?;
 
     Ok(treasury.vault_id)
 }
