@@ -110,7 +110,7 @@ impl Polygon {
 
                 self.transfer_asset(key, safe_txn_data).await?;
             },
-            None => (),
+            Some(PolygonNftEvent::UpdateMintsOwner(_)) | None => (),
         }
 
         Ok(())
@@ -269,6 +269,22 @@ impl Transactions<PolygonNftEventKey, PolygonTransaction, PolygonTransactionResu
         self.on_retry_mint_drop(key, tx.clone()).await?;
 
         Ok(tx)
+    }
+
+    async fn update_collection_mint(
+        &self,
+        _key: PolygonNftEventKey,
+        _payload: PolygonTransaction,
+    ) -> Result<PolygonTransactionResult> {
+        unreachable!()
+    }
+
+    async fn retry_update_collection_mint(
+        &self,
+        _key: PolygonNftEventKey,
+        _payload: PolygonTransaction,
+    ) -> Result<PolygonTransactionResult> {
+        unreachable!()
     }
 }
 
@@ -439,6 +455,22 @@ impl Events<PolygonNftEventKey, PolygonTransactionResult> for Polygon {
         self.producer.send(Some(&event), Some(&key.into())).await?;
 
         Ok(())
+    }
+
+    async fn on_update_collection_mint(
+        &self,
+        _key: PolygonNftEventKey,
+        _tx: PolygonTransactionResult,
+    ) -> Result<()> {
+        unreachable!()
+    }
+
+    async fn on_retry_update_mint(
+        &self,
+        _key: PolygonNftEventKey,
+        _tx: PolygonTransactionResult,
+    ) -> Result<()> {
+        unreachable!()
     }
 }
 

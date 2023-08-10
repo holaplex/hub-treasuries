@@ -222,6 +222,34 @@ impl Transactions<SolanaNftEventKey, SolanaPendingTransaction, SolanaTransaction
 
         Ok(tx)
     }
+
+    async fn update_collection_mint(
+        &self,
+        key: SolanaNftEventKey,
+        payload: SolanaPendingTransaction,
+    ) -> Result<SolanaTransactionResult> {
+        let tx = self
+            .send_transaction(TxType::UpdateMetadata, key.clone(), payload)
+            .await?;
+
+        self.on_update_collection_mint(key, tx.clone()).await?;
+
+        Ok(tx)
+    }
+
+    async fn retry_update_collection_mint(
+        &self,
+        key: SolanaNftEventKey,
+        payload: SolanaPendingTransaction,
+    ) -> Result<SolanaTransactionResult> {
+        let tx = self
+            .send_transaction(TxType::UpdateMetadata, key.clone(), payload)
+            .await?;
+
+        self.on_retry_update_mint(key, tx.clone()).await?;
+
+        Ok(tx)
+    }
 }
 
 #[async_trait]
@@ -424,6 +452,20 @@ impl Events<SolanaNftEventKey, SolanaTransactionResult> for Solana {
         Ok(())
     }
 
+    async fn on_update_collection_mint(
+        &self,
+        key: SolanaNftEventKey,
+        tx: SolanaTransactionResult,
+    ) -> Result<()> {
+        let event = TreasuryEvents {
+            event: Some(Event::SolanaUpdateCollectionMintSigned(tx)),
+        };
+
+        self.producer.send(Some(&event), Some(&key.into())).await?;
+
+        Ok(())
+    }
+
     async fn on_transfer_asset(
         &self,
         key: SolanaNftEventKey,
@@ -431,6 +473,20 @@ impl Events<SolanaNftEventKey, SolanaTransactionResult> for Solana {
     ) -> Result<()> {
         let event = TreasuryEvents {
             event: Some(Event::SolanaTransferAssetSigned(tx)),
+        };
+
+        self.producer.send(Some(&event), Some(&key.into())).await?;
+
+        Ok(())
+    }
+
+    async fn on_retry_update_mint(
+        &self,
+        key: SolanaNftEventKey,
+        tx: SolanaTransactionResult,
+    ) -> Result<()> {
+        let event = TreasuryEvents {
+            event: Some(Event::SolanaRetryUpdateCollectionMintSigned(tx)),
         };
 
         self.producer.send(Some(&event), Some(&key.into())).await?;
