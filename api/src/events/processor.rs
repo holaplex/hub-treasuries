@@ -109,19 +109,13 @@ impl Processor {
         }
     }
 
+    #[inline]
     fn solana(&self) -> Solana {
-        Solana::new(
-            self.fireblocks.clone(),
-            self.producer.clone(),
-            self.db.clone(),
-        )
+        Solana::new(&self)
     }
 
+    #[inline]
     fn polygon(&self) -> Polygon {
-        Polygon::new(
-            self.fireblocks.clone(),
-            self.producer.clone(),
-            self.db.clone(),
-        )
+        Polygon::new(&self)
     }
 }

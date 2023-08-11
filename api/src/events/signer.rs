@@ -4,12 +4,17 @@ use sea_orm::{prelude::*, DatabaseConnection, JoinType, QueryFilter, QuerySelect
 
 use super::{ProcessorError, Result};
 use crate::{
-    entities::{sea_orm_active_enums::TxType, treasuries, wallets},
+    entities::{treasuries, wallets},
     proto::{treasury_events::Event, TreasuryEventKey, TreasuryEvents},
 };
 
+pub trait EventKind<T> {
+    fn to_event(&self, txn: T) -> Event;
+}
+
 #[async_trait]
 pub trait Sign {
+    type EventKind: fmt::Debug + Send + EventKind<Self::Transaction>;
     type Signature;
     type Key: Clone + Into<TreasuryEventKey> + Send;
     type Payload: Send;
@@ -28,21 +33,17 @@ pub trait Sign {
 
     async fn send_and_notify(
         &self,
-        ty: TxType,
+        kind: Self::EventKind,
         key: Self::Key,
         txn: Self::Payload,
-        evt: fn(Self::Transaction) -> Event,
     ) -> Result<Self::Transaction> {
         let k = key.clone();
+        let txn = self.send_transaction(kind, k, txn).await?;
 
-        let txn = self.send_transaction(ty, k, txn).await?;
-
-        let t = txn.clone();
+        let evt = kind.to_event(txn.clone());
         self.producer()
             .send(
-                Some(&TreasuryEvents {
-                    event: Some(evt(t)),
-                }),
+                Some(&TreasuryEvents { event: Some(evt) }),
                 Some(&key.into()),
             )
             .await?;
@@ -52,7 +53,7 @@ pub trait Sign {
 
     async fn send_transaction(
         &self,
-        tx_type: TxType,
+        kind: Self::EventKind,
         key: Self::Key,
         payload: Self::Payload,
     ) -> Result<Self::Transaction>;
