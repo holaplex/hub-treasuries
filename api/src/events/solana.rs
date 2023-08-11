@@ -12,7 +12,7 @@ use crate::proto::{
     SolanaNftEventKey, SolanaNftEvents, SolanaPendingTransaction, TreasuryEventKey, TreasuryEvents,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum EventKind {
     CreateDrop,
     RetryCreateDrop,

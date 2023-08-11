@@ -2,11 +2,7 @@ use std::str::FromStr;
 
 use async_graphql::{Enum, Result, SimpleObject};
 use fireblocks::assets::{ETH, ETH_TEST, MATIC, MATIC_POLYGON, MATIC_TEST, SOL, SOL_TEST};
-use hub_core::{
-    anyhow::{anyhow, Error},
-    credits::Blockchain,
-    thiserror,
-};
+use hub_core::{credits::Blockchain, thiserror};
 use sea_orm::entity::prelude::*;
 
 /// Fireblocks-defined blockchain identifiers.

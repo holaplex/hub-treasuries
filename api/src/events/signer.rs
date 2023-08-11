@@ -8,7 +8,7 @@ use crate::{
     proto::{treasury_events::Event, TreasuryEventKey, TreasuryEvents},
 };
 
-pub trait EventKind<T> {
+pub trait EventKind<T>: Copy {
     fn to_event(&self, txn: T) -> Event;
 }
 

@@ -111,11 +111,11 @@ impl Processor {
 
     #[inline]
     fn solana(&self) -> Solana {
-        Solana::new(&self)
+        Solana::new(self)
     }
 
     #[inline]
     fn polygon(&self) -> Polygon {
-        Polygon::new(&self)
+        Polygon::new(self)
     }
 }
