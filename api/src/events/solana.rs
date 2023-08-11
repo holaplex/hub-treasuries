@@ -23,6 +23,8 @@ pub enum EventKind {
     CreateCollection,
     RetryCreateCollection,
     UpdateCollection,
+    UpdateCollectionMint,
+    RetryUpdateCollectionMint,
     MintToCollection,
     RetryMintToCollection,
 }
@@ -39,6 +41,10 @@ impl super::signer::EventKind<SolanaTransactionResult> for EventKind {
             EventKind::CreateCollection => Event::SolanaCreateCollectionSigned(txn),
             EventKind::RetryCreateCollection => Event::SolanaRetryCreateCollectionSigned(txn),
             EventKind::UpdateCollection => Event::SolanaUpdateCollectionSigned(txn),
+            EventKind::UpdateCollectionMint => Event::SolanaUpdateCollectionMintSigned(txn),
+            EventKind::RetryUpdateCollectionMint => {
+                Event::SolanaRetryUpdateCollectionMintSigned(txn)
+            },
             EventKind::MintToCollection => Event::SolanaMintToCollectionSigned(txn),
             EventKind::RetryMintToCollection => Event::SolanaRetryMintToCollectionSigned(txn),
         }
@@ -91,6 +97,14 @@ impl<'a> Solana<'a> {
             },
             Some(SolanaNftEvent::UpdateCollectionSigningRequested(payload)) => {
                 self.send_and_notify(EventKind::UpdateCollection, key, payload)
+                    .await?;
+            },
+            Some(SolanaNftEvent::UpdateCollectionMintSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::UpdateCollectionMint, key, payload)
+                    .await?;
+            },
+            Some(SolanaNftEvent::RetryUpdateMintSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::RetryUpdateCollectionMint, key, payload)
                     .await?;
             },
             Some(SolanaNftEvent::RetryCreateCollectionSigningRequested(payload)) => {
