@@ -69,7 +69,7 @@ impl Processor {
                         solana.transfer_asset(key.clone(), payload).await?;
                     },
                     Some(SolanaNftEvent::RetryCreateDropSigningRequested(payload)) => {
-                        solana.retry_mint_drop(key.clone(), payload).await?;
+                        solana.retry_create_drop(key.clone(), payload).await?;
                     },
                     Some(SolanaNftEvent::RetryMintDropSigningRequested(payload)) => {
                         solana.retry_mint_drop(key.clone(), payload).await?;
