@@ -82,10 +82,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install latest nightly
+      - name: Install rustfmt
         uses: actions-rs/toolchain@v1
         with:
-            toolchain: nightly-2022-12-11
+            toolchain: 1.69.0
             override: true
             components: rustfmt, clippy
       - name: cargo fmt
