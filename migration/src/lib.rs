@@ -17,6 +17,8 @@ mod m20230619_135838_remove_test_from_asset_id_on_wallets;
 mod m20230721_145312_add_create_collection_to_tx_type_enum;
 mod m20230724_142109_add_mint_to_collection_to_tx_type_enum;
 mod m20230828_114322_downcase_wallet_address_field_for_polygon;
+mod m20230823_114606_add_switch_collection_to_tx_type;
+
 pub struct Migrator;
 
 #[async_trait::async_trait]
@@ -40,6 +42,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20230721_145312_add_create_collection_to_tx_type_enum::Migration),
             Box::new(m20230724_142109_add_mint_to_collection_to_tx_type_enum::Migration),
             Box::new(m20230828_114322_downcase_wallet_address_field_for_polygon::Migration),
+            Box::new(m20230823_114606_add_switch_collection_to_tx_type::Migration),
         ]
     }
 }
