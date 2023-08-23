@@ -2,7 +2,7 @@ use async_graphql::{Context, Error, InputObject, Object, Result, SimpleObject};
 use fireblocks::{objects::vault::CreateVaultWallet, Fireblocks};
 use hub_core::{
     chrono::Utc,
-    credits::{CreditsClient, DeductionErrorKind, TransactionId},
+    credits::{CreditsClient, TransactionId},
     producer::Producer,
 };
 use sea_orm::{prelude::*, JoinType, QuerySelect, Set};
