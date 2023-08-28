@@ -16,8 +16,8 @@ mod m20230518_033212_set_default_timestamp;
 mod m20230619_135838_remove_test_from_asset_id_on_wallets;
 mod m20230721_145312_add_create_collection_to_tx_type_enum;
 mod m20230724_142109_add_mint_to_collection_to_tx_type_enum;
-mod m20230828_114322_downcase_wallet_address_field_for_polygon;
 mod m20230823_114606_add_switch_collection_to_tx_type;
+mod m20230828_114322_downcase_wallet_address_field_for_polygon;
 
 pub struct Migrator;
 
