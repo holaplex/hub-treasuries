@@ -2,13 +2,12 @@
 
 use hub_core::{
     anyhow::{Context as _, Result},
-    serde_json::{self},
-    thiserror,
+    reqwest::{Client as HttpClient, RequestBuilder, Url},
+    serde_json, thiserror,
     tokio::time,
     tracing::info,
 };
 use jsonwebtoken::EncodingKey;
-use reqwest::{Client as HttpClient, RequestBuilder, Url};
 use serde::Serialize;
 
 use crate::{
@@ -243,6 +242,7 @@ impl ReadRequestBuilder {
         let endpoint = "/v1/vault/accounts_paged";
         self.send(endpoint, filters).await
     }
+
     /// Retrieves the details of a specific transaction based on the transaction ID.
     ///
     /// # Arguments
@@ -521,6 +521,7 @@ impl CreateRequestBuilder {
         let endpoint = "/v1/transactions".to_string();
         self.send(&endpoint, tx).await
     }
+
     /// Creates a new wallet within a vault account for the specified asset.
     ///
     /// # Arguments

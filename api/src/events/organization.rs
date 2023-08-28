@@ -5,7 +5,7 @@ use fireblocks::{
 use hub_core::{prelude::*, uuid::Uuid};
 use sea_orm::{prelude::*, Set};
 
-use super::Processor;
+use super::{Processor, ProcessorError, Result};
 use crate::{
     entities::{
         project_treasuries, treasuries,
@@ -18,32 +18,8 @@ use crate::{
     },
 };
 
-#[async_trait]
-pub trait OrganizationEventHandler {
-    /// Creates a treasury for a project in an organization.
-    ///
-    /// # Arguments
-    /// * conn - A database connection object.
-    /// * fireblocks - A Fireblocks client object.
-    /// * producer - A Kafka producer object for sending events.
-    /// * key - The organization event key.
-    /// * project - The project details.
-    ///
-    /// # Errors
-    /// This function may return an error in the following cases:
-    /// * Failed to create a vault or wallets in Fireblocks.
-    /// * Failed to insert the treasury or project treasuries or wallet record in the local database.
-    /// * Failed to send the treasury event using the provided Kafka producer.
-    async fn create_project_treasury(
-        &self,
-        key: OrganizationEventKey,
-        project: Project,
-    ) -> Result<()>;
-}
-
-#[async_trait]
-impl OrganizationEventHandler for Processor {
-    async fn create_project_treasury(
+impl Processor {
+    pub(super) async fn create_project_treasury(
         &self,
         key: OrganizationEventKey,
         project: Project,
@@ -63,31 +39,23 @@ impl OrganizationEventHandler for Processor {
             .client()
             .create()
             .vault(create_vault)
-            .await?;
+            .await
+            .map_err(ProcessorError::Fireblocks)?;
 
         let treasury = treasuries::ActiveModel {
             vault_id: Set(vault.id.clone()),
             ..Default::default()
         };
 
-        let treasury: treasuries::Model = treasury
-            .clone()
-            .insert(conn)
-            .await
-            .context("failed to get treasury record from db")?;
+        let treasury: treasuries::Model = treasury.clone().insert(conn).await?;
 
         let project_treasuries_active_model = project_treasuries::ActiveModel {
-            project_id: Set(
-                Uuid::parse_str(&project.id).context("failed to parse project id to Uuid")?
-            ),
+            project_id: Set(Uuid::parse_str(&project.id)?),
             treasury_id: Set(treasury.id),
             ..Default::default()
         };
 
-        project_treasuries_active_model
-            .insert(conn)
-            .await
-            .context("failed to insert project treasuries")?;
+        project_treasuries_active_model.insert(conn).await?;
 
         for id in self.fireblocks.assets().ids() {
             let asset_type = AssetType::from_str(&id)?;
@@ -96,10 +64,15 @@ impl OrganizationEventHandler for Processor {
                 .fireblocks
                 .client()
                 .create()
-                .wallet(treasury.vault_id.clone(), id, CreateVaultWallet {
-                    eos_account_name: None,
-                })
-                .await?;
+                .wallet(
+                    treasury.vault_id.clone(),
+                    id,
+                    CreateVaultWallet {
+                        eos_account_name: None,
+                    },
+                )
+                .await
+                .map_err(ProcessorError::Fireblocks)?;
 
             let active_model = wallets::ActiveModel {
                 treasury_id: Set(treasury.id),
@@ -136,14 +109,14 @@ impl OrganizationEventHandler for Processor {
 }
 
 impl FromStr for Blockchain {
-    type Err = ();
+    type Err = ProcessorError;
 
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
+    fn from_str(value: &str) -> Result<Self> {
         match value {
             SOL | SOL_TEST => Ok(Blockchain::Solana),
             MATIC | MATIC_TEST => Ok(Blockchain::Polygon),
             ETH | ETH_TEST => Ok(Blockchain::Ethereum),
-            _ => Err(()),
+            v => Err(ProcessorError::InvalidBlockchain(v.into())),
         }
     }
 }
@@ -159,14 +132,14 @@ impl From<AssetType> for Blockchain {
 }
 
 impl TryFrom<Blockchain> for AssetType {
-    type Error = Error;
+    type Error = ProcessorError;
 
     fn try_from(value: Blockchain) -> Result<Self> {
         match value {
             Blockchain::Solana => Ok(AssetType::Solana),
             Blockchain::Polygon => Ok(AssetType::Matic),
             Blockchain::Ethereum => Ok(AssetType::Eth),
-            Blockchain::Unspecified => Err(anyhow!("Unspecified blockchain")),
+            v @ Blockchain::Unspecified => Err(ProcessorError::InvalidBlockchain(format!("{v:?}"))),
         }
     }
 }

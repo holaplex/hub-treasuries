@@ -50,7 +50,7 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/treasury.proto.rs"));
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Services {
     Organizations(proto::OrganizationEventKey, proto::OrganizationEvents),
     Customers(proto::CustomerEventKey, proto::CustomerEvents),

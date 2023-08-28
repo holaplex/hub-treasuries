@@ -2,10 +2,7 @@ use std::str::FromStr;
 
 use async_graphql::{Enum, Result, SimpleObject};
 use fireblocks::assets::{ETH, ETH_TEST, MATIC, MATIC_POLYGON, MATIC_TEST, SOL, SOL_TEST};
-use hub_core::{
-    anyhow::{anyhow, Error},
-    credits::Blockchain,
-};
+use hub_core::{credits::Blockchain, thiserror};
 use sea_orm::entity::prelude::*;
 
 /// Fireblocks-defined blockchain identifiers.
@@ -62,15 +59,19 @@ impl From<AssetType> for i32 {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("Invalid asset type {0:?}")]
+pub struct TryIntoAssetTypeError(String);
+
 impl FromStr for AssetType {
-    type Err = Error;
+    type Err = TryIntoAssetTypeError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             SOL | SOL_TEST => Ok(Self::Solana),
             MATIC_POLYGON | MATIC_TEST => Ok(Self::Matic),
             ETH | ETH_TEST => Ok(Self::Eth),
-            &_ => Err(anyhow!("unsupported  asset_type")),
+            s => Err(TryIntoAssetTypeError(s.into())),
         }
     }
 }
