@@ -45,10 +45,10 @@ prost-types = "0.11.9"
 
 [dependencies.hub-core]
 package = "holaplex-hub-core"
-version = "0.5.1"
+version = "0.5.4"
 git = "https://github.com/holaplex/hub-core"
 branch = "stable"
-features = ["kafka", "credits", "solana"]
+features = ["kafka", "credits", "sea-orm"]
 
 [build-dependencies.hub-core-build]
 package = "holaplex-hub-core-build"
