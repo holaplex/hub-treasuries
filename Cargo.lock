@@ -1893,8 +1893,8 @@ dependencies = [
 
 [[package]]
 name = "holaplex-hub-core"
-version = "0.5.3"
-source = "git+https://github.com/holaplex/hub-core?branch=stable#40a8dfab0dbf2d01b0eda61ff1ce831e1ea4a10b"
+version = "0.5.4"
+source = "git+https://github.com/holaplex/hub-core?branch=stable#1122dc679042e397360da0f85b20babff4c7ea12"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1917,7 +1917,6 @@ dependencies = [
  "sea-orm",
  "serde_json",
  "serde_with",
- "solana-sdk",
  "strum",
  "thiserror",
  "tokio",
@@ -1932,7 +1931,7 @@ dependencies = [
 [[package]]
 name = "holaplex-hub-core-build"
 version = "0.2.1"
-source = "git+https://github.com/holaplex/hub-core?branch=stable#40a8dfab0dbf2d01b0eda61ff1ce831e1ea4a10b"
+source = "git+https://github.com/holaplex/hub-core?branch=stable#1122dc679042e397360da0f85b20babff4c7ea12"
 dependencies = [
  "anyhow",
  "dotenv",
@@ -1951,7 +1950,7 @@ dependencies = [
 [[package]]
 name = "holaplex-hub-core-macros"
 version = "0.1.0"
-source = "git+https://github.com/holaplex/hub-core?branch=stable#40a8dfab0dbf2d01b0eda61ff1ce831e1ea4a10b"
+source = "git+https://github.com/holaplex/hub-core?branch=stable#1122dc679042e397360da0f85b20babff4c7ea12"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1962,7 +1961,7 @@ dependencies = [
 [[package]]
 name = "holaplex-hub-core-schemas"
 version = "0.3.2"
-source = "git+https://github.com/holaplex/hub-core?branch=stable#40a8dfab0dbf2d01b0eda61ff1ce831e1ea4a10b"
+source = "git+https://github.com/holaplex/hub-core?branch=stable#1122dc679042e397360da0f85b20babff4c7ea12"
 dependencies = [
  "holaplex-hub-core-build",
  "prost",

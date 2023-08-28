@@ -114,4 +114,6 @@ impl Related<super::treasuries::Entity> for Entity {
     }
 }
 
-impl ActiveModelBehavior for ActiveModel {}
+impl ActiveModelBehavior for ActiveModel {
+    hub_core::before_save_evm_addrs!(address);
+}
