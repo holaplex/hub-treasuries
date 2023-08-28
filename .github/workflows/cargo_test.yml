@@ -49,7 +49,7 @@ jobs:
 
       - uses: actions-rs/toolchain@v1
         with:
-            toolchain: nightly-2022-12-11
+            toolchain: nightly-2023-05-26
             override: true
             components: cargo, rustc
 
