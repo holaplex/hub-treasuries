@@ -64,13 +64,9 @@ impl Processor {
                 .fireblocks
                 .client()
                 .create()
-                .wallet(
-                    treasury.vault_id.clone(),
-                    id,
-                    CreateVaultWallet {
-                        eos_account_name: None,
-                    },
-                )
+                .wallet(treasury.vault_id.clone(), id, CreateVaultWallet {
+                    eos_account_name: None,
+                })
                 .await
                 .map_err(ProcessorError::Fireblocks)?;
 

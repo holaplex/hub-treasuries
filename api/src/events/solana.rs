@@ -27,6 +27,7 @@ pub enum EventKind {
     RetryUpdateCollectionMint,
     MintToCollection,
     RetryMintToCollection,
+    SwitchCollection,
 }
 
 impl super::signer::EventKind<SolanaTransactionResult> for EventKind {
@@ -47,6 +48,7 @@ impl super::signer::EventKind<SolanaTransactionResult> for EventKind {
             },
             EventKind::MintToCollection => Event::SolanaMintToCollectionSigned(txn),
             EventKind::RetryMintToCollection => Event::SolanaRetryMintToCollectionSigned(txn),
+            EventKind::SwitchCollection => Event::SolanaSwitchMintCollectionSigned(txn),
         }
     }
 }
@@ -117,6 +119,10 @@ impl<'a> Solana<'a> {
             },
             Some(SolanaNftEvent::RetryMintToCollectionSigningRequested(payload)) => {
                 self.send_and_notify(EventKind::RetryMintToCollection, key, payload)
+                    .await?;
+            },
+            Some(SolanaNftEvent::SwitchMintCollectionSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::SwitchCollection, key, payload)
                     .await?;
             },
             _ => (),

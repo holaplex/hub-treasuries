@@ -16,6 +16,8 @@ pub enum TxType {
     CreateCollection,
     #[sea_orm(string_value = "mint_to_collection")]
     MintToCollection,
+    #[sea_orm(string_value = "switch_collection")]
+    SwitchCollection,
 }
 
 impl From<TxType> for String {
@@ -27,6 +29,7 @@ impl From<TxType> for String {
             TxType::UpdateMetadata => "UpdateMetadata".to_string(),
             TxType::CreateCollection => "CreateCollection".to_string(),
             TxType::MintToCollection => "MintToCollection".to_string(),
+            TxType::SwitchCollection => "SwitchCollection".to_string(),
         }
     }
 }
