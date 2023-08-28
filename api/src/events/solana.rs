@@ -121,6 +121,10 @@ impl<'a> Solana<'a> {
                 self.send_and_notify(EventKind::RetryMintToCollection, key, payload)
                     .await?;
             },
+            Some(SolanaNftEvent::SwitchMintCollectionSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::SwitchCollection, key, payload)
+                    .await?;
+            },
             _ => (),
         }
 
