@@ -1,7 +1,10 @@
 #![allow(missing_debug_implementations)]
 
+use std::time::Duration;
+
 use hub_core::{
     anyhow::{Context as _, Result},
+    backon::{ExponentialBuilder, Retryable},
     reqwest::{Client as HttpClient, RequestBuilder, Url},
     serde_json, thiserror,
     tokio::time,
@@ -160,7 +163,15 @@ impl Client {
         let mut interval = time::interval(time::Duration::from_millis(2500));
 
         loop {
-            let tx_details = self.read().transaction(id.clone()).await?;
+            let tx_details = (|| async { self.read().transaction(id.clone()).await })
+                .retry(
+                    &ExponentialBuilder::default()
+                        .with_jitter()
+                        .with_min_delay(Duration::from_millis(250))
+                        .with_max_times(10),
+                )
+                .await?;
+
             let status = tx_details.clone().status;
 
             match status {
