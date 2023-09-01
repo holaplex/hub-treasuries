@@ -39,8 +39,8 @@ jobs:
 
       - uses: actions-rs/toolchain@v1
         with:
-            toolchain: 1.69.0
-            override: true
+            toolchain: 1.71.0
+            override: false
             components: cargo, rustc
 
       - uses: tespkg/actions-cache@v1
