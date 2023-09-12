@@ -47,6 +47,7 @@ impl<'a> Polygon<'a> {
         Self(processor)
     }
 
+    /// Processes Polygon service events.
     pub async fn process(&self, key: PolygonNftEventKey, e: PolygonNftEvents) -> Result<()> {
         match e.event {
             Some(PolygonNftEvent::SubmitCreateDropTxn(payload)) => {
