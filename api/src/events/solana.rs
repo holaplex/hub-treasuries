@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use hex::FromHex;
 use hub_core::{bs58, futures_util::future, metrics::KeyValue, prelude::*, producer::Producer};
 use solana_sdk::pubkey::Pubkey;
@@ -11,8 +13,6 @@ use crate::proto::{
     treasury_events::{Event, SolanaTransactionResult, TransactionStatus},
     SolanaNftEventKey, SolanaNftEvents, SolanaPendingTransaction, TreasuryEventKey, TreasuryEvents,
 };
-
-use std::time::Instant;
 
 #[derive(Debug, Clone, Copy)]
 pub enum EventKind {

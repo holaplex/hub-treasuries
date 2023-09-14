@@ -1,3 +1,8 @@
+use std::time::Instant;
+
+use fireblocks::objects::transaction::SignatureResponse;
+use hub_core::{metrics::KeyValue, prelude::*, producer::Producer};
+
 use super::{
     signer::{find_vault_id_by_wallet_address, sign_message, Sign},
     EcdsaSignatureScalar, Processor, ProcessorError, Result,
@@ -11,9 +16,6 @@ use crate::proto::{
     PermitArgsHash, PolygonNftEventKey, PolygonNftEvents, PolygonTokenTransferTxns,
     PolygonTransaction, TreasuryEventKey, TreasuryEvents,
 };
-use fireblocks::objects::transaction::SignatureResponse;
-use hub_core::{metrics::KeyValue, prelude::*, producer::Producer};
-use std::time::Instant;
 
 #[derive(Debug, Clone, Copy)]
 pub enum EventKind {
