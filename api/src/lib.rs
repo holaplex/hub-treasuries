@@ -8,6 +8,7 @@ pub mod db;
 pub mod entities;
 pub mod events;
 pub mod handlers;
+pub mod metrics;
 pub mod mutations;
 pub mod objects;
 pub mod queries;
@@ -33,6 +34,7 @@ use hub_core::{
     tokio,
     uuid::Uuid,
 };
+use metrics::Metrics;
 use mutations::Mutation;
 use poem::{async_trait, FromRequest, Request, RequestBody};
 use proto::{TreasuryEventKey, TreasuryEvents};

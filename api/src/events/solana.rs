@@ -1,5 +1,7 @@
+use std::time::Instant;
+
 use hex::FromHex;
-use hub_core::{bs58, futures_util::future, prelude::*, producer::Producer};
+use hub_core::{bs58, futures_util::future, metrics::KeyValue, prelude::*, producer::Producer};
 use solana_sdk::pubkey::Pubkey;
 
 use super::{
@@ -183,9 +185,17 @@ impl<'a> Sign for Solana<'a> {
         message: Vec<u8>,
         vault_id: String,
     ) -> Result<String> {
+        let start = Instant::now();
+
         let sig = sign_message::<Self>(&self.0.fireblocks, note, message, vault_id).await?;
         let sig = <[u8; 64]>::from_hex(sig.full_sig)?;
         let sig = bs58::encode(sig).into_string();
+
+        let elapsed = i64::try_from(start.elapsed().as_millis()).unwrap_or(0);
+        self.0
+            .metrics
+            .sign_duration_ms_bucket
+            .record(elapsed, &[KeyValue::new("blockchain", "Solana")]);
 
         Ok(sig)
     }
