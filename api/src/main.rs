@@ -4,7 +4,8 @@ use holaplex_hub_treasuries::{
     build_schema,
     db::Connection,
     events,
-    handlers::{graphql_handler, health, playground},
+    handlers::{graphql_handler, health, metrics_handler, playground},
+    metrics::Metrics,
     proto, Actions, AppState, Args, Services,
 };
 use hub_core::{anyhow::Context as AnyhowContext, prelude::*, tokio};
@@ -31,8 +32,14 @@ pub fn main() {
             let fireblocks = fireblocks::Fireblocks::new(fireblocks)?;
             let producer = common.producer_cfg.build::<proto::TreasuryEvents>().await?;
 
-            let event_processor =
-                events::Processor::new(connection.clone(), producer.clone(), fireblocks.clone());
+            let metrics = Metrics::new()?;
+
+            let event_processor = events::Processor::new(
+                connection.clone(),
+                producer.clone(),
+                fireblocks.clone(),
+                metrics.clone(),
+            );
 
             let credits = common.credits_cfg.build::<Actions>().await?;
             let state = AppState::new(
@@ -62,7 +69,8 @@ pub fn main() {
                     Route::new()
                         .at("/graphql", post(graphql_handler).with(AddData::new(state)))
                         .at("/playground", get(playground))
-                        .at("/health", get(health)),
+                        .at("/health", get(health))
+                        .at("/metrics", get(metrics_handler).with(AddData::new(metrics))),
                 )
                 .await
                 .context("failed to build graphql server")

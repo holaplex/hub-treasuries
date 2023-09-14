@@ -1,6 +1,3 @@
-use fireblocks::objects::transaction::SignatureResponse;
-use hub_core::{prelude::*, producer::Producer};
-
 use super::{
     signer::{find_vault_id_by_wallet_address, sign_message, Sign},
     EcdsaSignatureScalar, Processor, ProcessorError, Result,
@@ -14,6 +11,9 @@ use crate::proto::{
     PermitArgsHash, PolygonNftEventKey, PolygonNftEvents, PolygonTokenTransferTxns,
     PolygonTransaction, TreasuryEventKey, TreasuryEvents,
 };
+use fireblocks::objects::transaction::SignatureResponse;
+use hub_core::{metrics::KeyValue, prelude::*, producer::Producer};
+use std::time::Instant;
 
 #[derive(Debug, Clone, Copy)]
 pub enum EventKind {
@@ -176,7 +176,17 @@ impl<'a> Sign for Polygon<'a> {
         message: Vec<u8>,
         vault_id: String,
     ) -> Result<SignatureResponse> {
-        sign_message::<Self>(&self.0.fireblocks, note, message, vault_id).await
+        let start = Instant::now();
+
+        let sig = sign_message::<Self>(&self.0.fireblocks, note, message, vault_id).await;
+
+        let elapsed = i64::try_from(start.elapsed().as_millis()).unwrap_or(0);
+        self.0
+            .metrics
+            .sign_duration_ms_bucket
+            .record(elapsed, &[KeyValue::new("blockchain", "Polygon")]);
+
+        sig
     }
 
     async fn send_transaction(

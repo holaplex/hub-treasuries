@@ -10,6 +10,7 @@ use super::{polygon::Polygon, solana::Solana};
 use crate::{
     db::Connection,
     entities::wallets::TryIntoAssetTypeError,
+    metrics::Metrics,
     proto::{
         customer_events::Event as CustomerEvent, organization_events::Event as OrganizationEvent,
         TreasuryEvents,
@@ -76,15 +77,22 @@ pub struct Processor {
     pub db: Connection,
     pub fireblocks: Fireblocks,
     pub producer: Producer<TreasuryEvents>,
+    pub metrics: Metrics,
 }
 
 impl Processor {
     #[must_use]
-    pub fn new(db: Connection, producer: Producer<TreasuryEvents>, fireblocks: Fireblocks) -> Self {
+    pub fn new(
+        db: Connection,
+        producer: Producer<TreasuryEvents>,
+        fireblocks: Fireblocks,
+        metrics: Metrics,
+    ) -> Self {
         Self {
             db,
             fireblocks,
             producer,
+            metrics,
         }
     }
 
