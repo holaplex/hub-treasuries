@@ -14,11 +14,11 @@ use crate::proto::{
 
 #[derive(Debug, Clone, Copy)]
 pub enum EventKind {
-    CreateDrop,
-    RetryCreateDrop,
-    UpdateDrop,
-    MintDrop,
-    RetryMintDrop,
+    CreateEditionDrop,
+    RetryCreateEditionDrop,
+    UpdateEditionDrop,
+    MintEditionDrop,
+    RetryMintEditionDrop,
     TransferAsset,
     CreateCollection,
     RetryCreateCollection,
@@ -28,16 +28,21 @@ pub enum EventKind {
     MintToCollection,
     RetryMintToCollection,
     SwitchCollection,
+    CreateOpenDrop,
+    RetryCreateOpenDrop,
+    UpdateOpenDrop,
+    MintOpenDrop,
+    RetryMintOpenDrop,
 }
 
 impl super::signer::EventKind<SolanaTransactionResult> for EventKind {
     fn to_event(&self, txn: SolanaTransactionResult) -> Event {
         match self {
-            EventKind::CreateDrop => Event::SolanaCreateDropSigned(txn),
-            EventKind::RetryCreateDrop => Event::SolanaRetryCreateDropSigned(txn),
-            EventKind::UpdateDrop => Event::SolanaUpdateDropSigned(txn),
-            EventKind::MintDrop => Event::SolanaMintDropSigned(txn),
-            EventKind::RetryMintDrop => Event::SolanaRetryMintDropSigned(txn),
+            EventKind::CreateEditionDrop => Event::SolanaCreateEditionDropSigned(txn),
+            EventKind::RetryCreateEditionDrop => Event::SolanaRetryCreateEditionDropSigned(txn),
+            EventKind::UpdateEditionDrop => Event::SolanaUpdateEditionDropSigned(txn),
+            EventKind::MintEditionDrop => Event::SolanaMintEditionDropSigned(txn),
+            EventKind::RetryMintEditionDrop => Event::SolanaRetryMintEditionDropSigned(txn),
             EventKind::TransferAsset => Event::SolanaTransferAssetSigned(txn),
             EventKind::CreateCollection => Event::SolanaCreateCollectionSigned(txn),
             EventKind::RetryCreateCollection => Event::SolanaRetryCreateCollectionSigned(txn),
@@ -49,6 +54,11 @@ impl super::signer::EventKind<SolanaTransactionResult> for EventKind {
             EventKind::MintToCollection => Event::SolanaMintToCollectionSigned(txn),
             EventKind::RetryMintToCollection => Event::SolanaRetryMintToCollectionSigned(txn),
             EventKind::SwitchCollection => Event::SolanaSwitchMintCollectionSigned(txn),
+            EventKind::CreateOpenDrop => Event::SolanaCreateOpenDropSigned(txn),
+            EventKind::RetryCreateOpenDrop => Event::SolanaRetryCreateOpenDropSigned(txn),
+            EventKind::UpdateOpenDrop => Event::SolanaUpdateOpenDropSigned(txn),
+            EventKind::MintOpenDrop => Event::SolanaMintOpenDropSigned(txn),
+            EventKind::RetryMintOpenDrop => Event::SolanaRetryMintOpenDropSigned(txn),
         }
     }
 }
@@ -69,28 +79,28 @@ impl<'a> Solana<'a> {
 
     pub async fn process(&self, key: SolanaNftEventKey, e: SolanaNftEvents) -> Result<()> {
         match e.event {
-            Some(SolanaNftEvent::CreateDropSigningRequested(payload)) => {
-                self.send_and_notify(EventKind::CreateDrop, key, payload)
+            Some(SolanaNftEvent::CreateEditionDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::CreateEditionDrop, key, payload)
                     .await?;
             },
-            Some(SolanaNftEvent::UpdateDropSigningRequested(payload)) => {
-                self.send_and_notify(EventKind::UpdateDrop, key, payload)
+            Some(SolanaNftEvent::UpdateEditionDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::UpdateEditionDrop, key, payload)
                     .await?;
             },
-            Some(SolanaNftEvent::MintDropSigningRequested(payload)) => {
-                self.send_and_notify(EventKind::MintDrop, key, payload)
+            Some(SolanaNftEvent::MintEditionDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::MintEditionDrop, key, payload)
                     .await?;
             },
             Some(SolanaNftEvent::TransferAssetSigningRequested(payload)) => {
                 self.send_and_notify(EventKind::TransferAsset, key, payload)
                     .await?;
             },
-            Some(SolanaNftEvent::RetryCreateDropSigningRequested(payload)) => {
-                self.send_and_notify(EventKind::RetryCreateDrop, key, payload)
+            Some(SolanaNftEvent::RetryCreateEditionDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::RetryCreateEditionDrop, key, payload)
                     .await?;
             },
-            Some(SolanaNftEvent::RetryMintDropSigningRequested(payload)) => {
-                self.send_and_notify(EventKind::RetryMintDrop, key, payload)
+            Some(SolanaNftEvent::RetryMintEditionDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::RetryMintEditionDrop, key, payload)
                     .await?;
             },
             Some(SolanaNftEvent::CreateCollectionSigningRequested(payload)) => {
@@ -123,6 +133,26 @@ impl<'a> Solana<'a> {
             },
             Some(SolanaNftEvent::SwitchMintCollectionSigningRequested(payload)) => {
                 self.send_and_notify(EventKind::SwitchCollection, key, payload)
+                    .await?;
+            },
+            Some(SolanaNftEvent::CreateOpenDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::CreateOpenDrop, key, payload)
+                    .await?;
+            },
+            Some(SolanaNftEvent::RetryCreateOpenDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::RetryCreateOpenDrop, key, payload)
+                    .await?;
+            },
+            Some(SolanaNftEvent::UpdateOpenDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::UpdateOpenDrop, key, payload)
+                    .await?;
+            },
+            Some(SolanaNftEvent::MintOpenDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::MintOpenDrop, key, payload)
+                    .await?;
+            },
+            Some(SolanaNftEvent::RetryMintOpenDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::RetryMintOpenDrop, key, payload)
                     .await?;
             },
             _ => (),
