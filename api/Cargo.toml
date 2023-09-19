@@ -42,9 +42,9 @@ solana-sdk = "1.16.13"
 
 [dependencies.hub-core]
 package = "holaplex-hub-core"
-#version = "0.5.5"
+version = "0.5.5"
 git = "https://github.com/holaplex/hub-core"
-#branch = "stable"
+branch = "stable"
 features = ["kafka", "credits", "sea-orm", "metrics"]
 
 [build-dependencies.hub-core-build]
