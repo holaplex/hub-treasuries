@@ -1,8 +1,10 @@
 use std::time::Instant;
 
 use hex::FromHex;
-use hub_core::{bs58, futures_util::future, metrics::KeyValue, prelude::*, producer::Producer};
-use solana_sdk::pubkey::Pubkey;
+use hub_core::{
+    bs58, futures_util::future, metrics::KeyValue, prelude::*, producer::Producer,
+    util::ValidateAddress,
+};
 
 use super::{
     signer::{find_vault_id_by_wallet_address, sign_message, Sign},
@@ -72,11 +74,6 @@ impl<'a> Solana<'a> {
     #[must_use]
     pub fn new(processor: &'a Processor) -> Self {
         Self(processor)
-    }
-
-    #[must_use]
-    pub fn is_public_key(test_case: &str) -> bool {
-        Pubkey::from_str(test_case).is_ok()
     }
 
     pub async fn process(&self, key: SolanaNftEventKey, e: SolanaNftEvents) -> Result<()> {
@@ -218,7 +215,7 @@ impl<'a> Sign for Solana<'a> {
         let mut fireblocks_requests = Vec::new();
 
         for req_sig in signatures_or_signers_public_keys {
-            if Self::is_public_key(&req_sig) {
+            if ValidateAddress::is_solana_address(&req_sig) {
                 let vault_id = find_vault_id_by_wallet_address(conn, req_sig).await?;
 
                 let fireblocks_request: future::BoxFuture<Result<String>> =
