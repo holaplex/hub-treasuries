@@ -1,7 +1,10 @@
 use std::time::Instant;
 
 use hex::FromHex;
-use hub_core::{bs58, futures_util::future, metrics::KeyValue, prelude::*, producer::Producer, util::ValidateAddress};
+use hub_core::{
+    bs58, futures_util::future, metrics::KeyValue, prelude::*, producer::Producer,
+    util::ValidateAddress,
+};
 
 use super::{
     signer::{find_vault_id_by_wallet_address, sign_message, Sign},
@@ -72,8 +75,6 @@ impl<'a> Solana<'a> {
     pub fn new(processor: &'a Processor) -> Self {
         Self(processor)
     }
-
-    
 
     pub async fn process(&self, key: SolanaNftEventKey, e: SolanaNftEvents) -> Result<()> {
         match e.event {

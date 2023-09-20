@@ -7,7 +7,7 @@ pub struct Query;
 
 #[Object(name = "WalletQuery")]
 impl Query {
-    /// Entity resolver for Wallet. 
+    /// Entity resolver for Wallet.
     /// Retrieves a Wallet model by its blockchain address.
     ///
     /// This method is marked as an entity resolver in a federated GraphQL schema,
