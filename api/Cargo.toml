@@ -23,29 +23,28 @@ sea-orm = { version = "0.11.3", features = [
   "runtime-tokio-rustls",
   "sqlx-postgres",
 ] }
-async-graphql = { version = "5.0.9", features = [
+async-graphql = { version = "5.0.10", features = [
   "chrono",
   "uuid",
   "log",
   "dataloader",
   "apollo_tracing",
 ] }
-serde = { version = "1.0.163", features = ["derive"] }
-poem = { version = "1.3.55", features = ["anyhow", "test"] }
-async-graphql-poem = "5.0.9"
+serde = { version = "1.0.188", features = ["derive"] }
+poem = { version = "1.3.58", features = ["anyhow", "test"] }
+async-graphql-poem = "5.0.10"
 prost = "0.11.9"
 prost-types = "0.11.9"
 hex = "0.4.3"
 bincode = "1.3.3"
 strum = { version = "0.24.1", features = ["derive"] }
-solana-sdk = "1.14.11"
 
 [dependencies.hub-core]
 package = "holaplex-hub-core"
-version = "0.5.4"
+version = "0.5.5"
 git = "https://github.com/holaplex/hub-core"
 branch = "stable"
-features = ["kafka", "credits", "sea-orm"]
+features = ["kafka", "credits", "sea-orm", "metrics"]
 
 [build-dependencies.hub-core-build]
 package = "holaplex-hub-core-build"

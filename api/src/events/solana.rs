@@ -1,6 +1,10 @@
+use std::time::Instant;
+
 use hex::FromHex;
-use hub_core::{bs58, futures_util::future, prelude::*, producer::Producer};
-use solana_sdk::pubkey::Pubkey;
+use hub_core::{
+    bs58, futures_util::future, metrics::KeyValue, prelude::*, producer::Producer,
+    util::ValidateAddress,
+};
 
 use super::{
     signer::{find_vault_id_by_wallet_address, sign_message, Sign},
@@ -14,11 +18,11 @@ use crate::proto::{
 
 #[derive(Debug, Clone, Copy)]
 pub enum EventKind {
-    CreateDrop,
-    RetryCreateDrop,
-    UpdateDrop,
-    MintDrop,
-    RetryMintDrop,
+    CreateEditionDrop,
+    RetryCreateEditionDrop,
+    UpdateEditionDrop,
+    MintEditionDrop,
+    RetryMintEditionDrop,
     TransferAsset,
     CreateCollection,
     RetryCreateCollection,
@@ -28,16 +32,21 @@ pub enum EventKind {
     MintToCollection,
     RetryMintToCollection,
     SwitchCollection,
+    CreateOpenDrop,
+    RetryCreateOpenDrop,
+    UpdateOpenDrop,
+    MintOpenDrop,
+    RetryMintOpenDrop,
 }
 
 impl super::signer::EventKind<SolanaTransactionResult> for EventKind {
     fn to_event(&self, txn: SolanaTransactionResult) -> Event {
         match self {
-            EventKind::CreateDrop => Event::SolanaCreateDropSigned(txn),
-            EventKind::RetryCreateDrop => Event::SolanaRetryCreateDropSigned(txn),
-            EventKind::UpdateDrop => Event::SolanaUpdateDropSigned(txn),
-            EventKind::MintDrop => Event::SolanaMintDropSigned(txn),
-            EventKind::RetryMintDrop => Event::SolanaRetryMintDropSigned(txn),
+            EventKind::CreateEditionDrop => Event::SolanaCreateEditionDropSigned(txn),
+            EventKind::RetryCreateEditionDrop => Event::SolanaRetryCreateEditionDropSigned(txn),
+            EventKind::UpdateEditionDrop => Event::SolanaUpdateEditionDropSigned(txn),
+            EventKind::MintEditionDrop => Event::SolanaMintEditionDropSigned(txn),
+            EventKind::RetryMintEditionDrop => Event::SolanaRetryMintEditionDropSigned(txn),
             EventKind::TransferAsset => Event::SolanaTransferAssetSigned(txn),
             EventKind::CreateCollection => Event::SolanaCreateCollectionSigned(txn),
             EventKind::RetryCreateCollection => Event::SolanaRetryCreateCollectionSigned(txn),
@@ -49,6 +58,11 @@ impl super::signer::EventKind<SolanaTransactionResult> for EventKind {
             EventKind::MintToCollection => Event::SolanaMintToCollectionSigned(txn),
             EventKind::RetryMintToCollection => Event::SolanaRetryMintToCollectionSigned(txn),
             EventKind::SwitchCollection => Event::SolanaSwitchMintCollectionSigned(txn),
+            EventKind::CreateOpenDrop => Event::SolanaCreateOpenDropSigned(txn),
+            EventKind::RetryCreateOpenDrop => Event::SolanaRetryCreateOpenDropSigned(txn),
+            EventKind::UpdateOpenDrop => Event::SolanaUpdateOpenDropSigned(txn),
+            EventKind::MintOpenDrop => Event::SolanaMintOpenDropSigned(txn),
+            EventKind::RetryMintOpenDrop => Event::SolanaRetryMintOpenDropSigned(txn),
         }
     }
 }
@@ -62,35 +76,30 @@ impl<'a> Solana<'a> {
         Self(processor)
     }
 
-    #[must_use]
-    pub fn is_public_key(test_case: &str) -> bool {
-        Pubkey::from_str(test_case).is_ok()
-    }
-
     pub async fn process(&self, key: SolanaNftEventKey, e: SolanaNftEvents) -> Result<()> {
         match e.event {
-            Some(SolanaNftEvent::CreateDropSigningRequested(payload)) => {
-                self.send_and_notify(EventKind::CreateDrop, key, payload)
+            Some(SolanaNftEvent::CreateEditionDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::CreateEditionDrop, key, payload)
                     .await?;
             },
-            Some(SolanaNftEvent::UpdateDropSigningRequested(payload)) => {
-                self.send_and_notify(EventKind::UpdateDrop, key, payload)
+            Some(SolanaNftEvent::UpdateEditionDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::UpdateEditionDrop, key, payload)
                     .await?;
             },
-            Some(SolanaNftEvent::MintDropSigningRequested(payload)) => {
-                self.send_and_notify(EventKind::MintDrop, key, payload)
+            Some(SolanaNftEvent::MintEditionDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::MintEditionDrop, key, payload)
                     .await?;
             },
             Some(SolanaNftEvent::TransferAssetSigningRequested(payload)) => {
                 self.send_and_notify(EventKind::TransferAsset, key, payload)
                     .await?;
             },
-            Some(SolanaNftEvent::RetryCreateDropSigningRequested(payload)) => {
-                self.send_and_notify(EventKind::RetryCreateDrop, key, payload)
+            Some(SolanaNftEvent::RetryCreateEditionDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::RetryCreateEditionDrop, key, payload)
                     .await?;
             },
-            Some(SolanaNftEvent::RetryMintDropSigningRequested(payload)) => {
-                self.send_and_notify(EventKind::RetryMintDrop, key, payload)
+            Some(SolanaNftEvent::RetryMintEditionDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::RetryMintEditionDrop, key, payload)
                     .await?;
             },
             Some(SolanaNftEvent::CreateCollectionSigningRequested(payload)) => {
@@ -125,6 +134,26 @@ impl<'a> Solana<'a> {
                 self.send_and_notify(EventKind::SwitchCollection, key, payload)
                     .await?;
             },
+            Some(SolanaNftEvent::CreateOpenDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::CreateOpenDrop, key, payload)
+                    .await?;
+            },
+            Some(SolanaNftEvent::RetryCreateOpenDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::RetryCreateOpenDrop, key, payload)
+                    .await?;
+            },
+            Some(SolanaNftEvent::UpdateOpenDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::UpdateOpenDrop, key, payload)
+                    .await?;
+            },
+            Some(SolanaNftEvent::MintOpenDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::MintOpenDrop, key, payload)
+                    .await?;
+            },
+            Some(SolanaNftEvent::RetryMintOpenDropSigningRequested(payload)) => {
+                self.send_and_notify(EventKind::RetryMintOpenDrop, key, payload)
+                    .await?;
+            },
             _ => (),
         }
 
@@ -153,9 +182,17 @@ impl<'a> Sign for Solana<'a> {
         message: Vec<u8>,
         vault_id: String,
     ) -> Result<String> {
+        let start = Instant::now();
+
         let sig = sign_message::<Self>(&self.0.fireblocks, note, message, vault_id).await?;
         let sig = <[u8; 64]>::from_hex(sig.full_sig)?;
         let sig = bs58::encode(sig).into_string();
+
+        let elapsed = i64::try_from(start.elapsed().as_millis()).unwrap_or(0);
+        self.0
+            .metrics
+            .sign_duration_ms_bucket
+            .record(elapsed, &[KeyValue::new("blockchain", "Solana")]);
 
         Ok(sig)
     }
@@ -178,7 +215,7 @@ impl<'a> Sign for Solana<'a> {
         let mut fireblocks_requests = Vec::new();
 
         for req_sig in signatures_or_signers_public_keys {
-            if Self::is_public_key(&req_sig) {
+            if ValidateAddress::is_solana_address(&req_sig) {
                 let vault_id = find_vault_id_by_wallet_address(conn, req_sig).await?;
 
                 let fireblocks_request: future::BoxFuture<Result<String>> =

@@ -1,5 +1,7 @@
+use std::time::Instant;
+
 use fireblocks::objects::transaction::SignatureResponse;
-use hub_core::{prelude::*, producer::Producer};
+use hub_core::{metrics::KeyValue, prelude::*, producer::Producer};
 
 use super::{
     signer::{find_vault_id_by_wallet_address, sign_message, Sign},
@@ -47,6 +49,7 @@ impl<'a> Polygon<'a> {
         Self(processor)
     }
 
+    /// Processes Polygon service events.
     pub async fn process(&self, key: PolygonNftEventKey, e: PolygonNftEvents) -> Result<()> {
         match e.event {
             Some(PolygonNftEvent::SubmitCreateDropTxn(payload)) => {
@@ -176,7 +179,17 @@ impl<'a> Sign for Polygon<'a> {
         message: Vec<u8>,
         vault_id: String,
     ) -> Result<SignatureResponse> {
-        sign_message::<Self>(&self.0.fireblocks, note, message, vault_id).await
+        let start = Instant::now();
+
+        let sig = sign_message::<Self>(&self.0.fireblocks, note, message, vault_id).await;
+
+        let elapsed = i64::try_from(start.elapsed().as_millis()).unwrap_or(0);
+        self.0
+            .metrics
+            .sign_duration_ms_bucket
+            .record(elapsed, &[KeyValue::new("blockchain", "Polygon")]);
+
+        sig
     }
 
     async fn send_transaction(
