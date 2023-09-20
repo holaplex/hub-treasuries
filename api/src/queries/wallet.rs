@@ -17,6 +17,10 @@ impl Query {
         ctx: &Context<'_>,
         #[graphql(key)] address: String,
     ) -> Result<Option<Model>> {
+        self.wallet(ctx, address).await
+    }
+
+    async fn wallet(&self, ctx: &Context<'_>, address: String) -> Result<Option<Model>> {
         if !ValidateAddress::is_blockchain_address(&address) {
             return Err(Error::new("Invalid address"));
         }
