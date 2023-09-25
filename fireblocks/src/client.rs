@@ -167,7 +167,7 @@ impl Client {
                 .retry(
                     &ExponentialBuilder::default()
                         .with_jitter()
-                        .with_min_delay(Duration::from_millis(250))
+                        .with_min_delay(Duration::from_millis(30))
                         .with_max_times(10),
                 )
                 .await?;
