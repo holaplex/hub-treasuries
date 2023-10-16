@@ -8,12 +8,13 @@ use hub_core::{
 
 use super::{
     signer::{find_vault_id_by_wallet_address, sign_message, Sign},
-    Processor, Result,
+    Processor, ProcessorError, Result,
 };
 use crate::proto::{
     solana_nft_events::Event as SolanaNftEvent,
     treasury_events::{Event, SolanaTransactionResult, TransactionStatus},
-    SolanaNftEventKey, SolanaNftEvents, SolanaPendingTransaction, TreasuryEventKey, TreasuryEvents,
+    SolanaMintBatchPayload, SolanaNftEventKey, SolanaNftEvents, SolanaPendingTransaction,
+    TreasuryEventKey, TreasuryEvents,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -154,7 +155,110 @@ impl<'a> Solana<'a> {
                 self.send_and_notify(EventKind::RetryMintOpenDrop, key, payload)
                     .await?;
             },
+            Some(SolanaNftEvent::MintOpenDropBatchSigningRequested(payload)) => {
+                self.sign_mint_batch(key, payload).await?;
+            },
             _ => (),
+        }
+
+        Ok(())
+    }
+
+    pub async fn sign_mint_batch(
+        &self,
+        key: SolanaNftEventKey,
+        payload: SolanaMintBatchPayload,
+    ) -> Result<()> {
+        let conn = self.0.db.get();
+        let fireblocks = &self.0.fireblocks;
+        let pubkeys = payload.signers_pubkeys.clone();
+
+        let note = &format!(
+            "Mint batch signing for collection {:?} by {:?} for project {:?}",
+            key.id, key.user_id, key.project_id,
+        );
+
+        let messages = &payload
+            .mint_transactions
+            .clone()
+            .into_iter()
+            .map(|m| m.serialized_message)
+            .collect::<Vec<_>>();
+
+        let tx = |vault: String| async move {
+            let asset_id = fireblocks.assets().id("SOL");
+
+            let transaction = fireblocks
+                .client()
+                .create()
+                .raw_transaction(asset_id, vault, messages.clone(), note.to_string())
+                .await
+                .map_err(ProcessorError::Fireblocks)?;
+
+            let details = fireblocks
+                .client()
+                .wait_on_transaction_completion(transaction.id)
+                .await
+                .map_err(ProcessorError::Fireblocks)?;
+
+            Result::<_>::Ok(details)
+        };
+
+        let mut futures = Vec::new();
+
+        for req_sig in pubkeys.clone() {
+            let vault_id = find_vault_id_by_wallet_address(conn, req_sig).await?;
+            futures.push(tx(vault_id));
+        }
+
+        let futs_result = future::join_all(futures)
+            .await
+            .into_iter()
+            .map(|r| r.map(|d| d.signed_messages))
+            .collect::<Result<Vec<_>>>()?;
+
+        let signatures = futs_result[0]
+            .clone()
+            .into_iter()
+            .zip(
+                payload
+                    .mint_transactions
+                    .iter()
+                    .map(|m| m.signer_signature.clone()),
+            )
+            .zip(futs_result[1].clone().into_iter())
+            .map(|((a, b), c)| (a, b, c))
+            .collect::<Vec<_>>();
+
+        for (sig1, sig2, sig3) in signatures {
+            let key = key.clone();
+
+            let sig1_bytes = <[u8; 64]>::from_hex(sig1.signature.full_sig)?;
+            let sig1 = bs58::encode(sig1_bytes).into_string();
+
+            let sig3_bytes = <[u8; 64]>::from_hex(sig3.signature.full_sig)?;
+            let sig3 = bs58::encode(sig3_bytes).into_string();
+
+            let mut signed_message_signatures = vec![sig1, sig3];
+
+            // this will be true if mint is uncompressed
+            if let Some(sig2) = sig2 {
+                signed_message_signatures.insert(1, sig2);
+            }
+
+            let txn = SolanaTransactionResult {
+                serialized_message: None,
+                signed_message_signatures,
+                status: TransactionStatus::Completed.into(),
+            };
+
+            let evt = Event::SolanaMintOpenDropSigned(txn);
+            self.producer()
+                .send(
+                    Some(&TreasuryEvents { event: Some(evt) }),
+                    Some(&key.into()),
+                )
+                .await?;
         }
 
         Ok(())
