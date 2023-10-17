@@ -13,7 +13,7 @@ use super::{
 use crate::proto::{
     solana_nft_events::Event as SolanaNftEvent,
     treasury_events::{Event, SolanaTransactionResult, TransactionStatus},
-    SolanaMintBatchPayload, SolanaNftEventKey, SolanaNftEvents, SolanaPendingTransaction,
+    SolanaMintPendingTransactions, SolanaNftEventKey, SolanaNftEvents, SolanaPendingTransaction,
     TreasuryEventKey, TreasuryEvents,
 };
 
@@ -155,7 +155,7 @@ impl<'a> Solana<'a> {
                 self.send_and_notify(EventKind::RetryMintOpenDrop, key, payload)
                     .await?;
             },
-            Some(SolanaNftEvent::MintOpenDropBatchSigningRequested(payload)) => {
+            Some(SolanaNftEvent::MintOpenDropBatchedSigningRequested(payload)) => {
                 self.sign_mint_batch(key, payload).await?;
             },
             _ => (),
@@ -167,7 +167,7 @@ impl<'a> Solana<'a> {
     pub async fn sign_mint_batch(
         &self,
         key: SolanaNftEventKey,
-        payload: SolanaMintBatchPayload,
+        payload: SolanaMintPendingTransactions,
     ) -> Result<()> {
         let conn = self.0.db.get();
         let fireblocks = &self.0.fireblocks;
