@@ -173,6 +173,10 @@ impl<'a> Solana<'a> {
         let fireblocks = &self.0.fireblocks;
         let pubkeys = payload.signers_pubkeys.clone();
 
+        if pubkeys.len() != 2 {
+            return Err(ProcessorError::InvalidNumberOfSigners);
+        }
+
         let note = &format!(
             "Mint batch signing for collection {:?} by {:?} for project {:?}",
             key.id, key.user_id, key.project_id,
@@ -220,35 +224,34 @@ impl<'a> Solana<'a> {
         let signatures = futs_result[0]
             .clone()
             .into_iter()
+            .zip(futs_result[1].clone().into_iter())
             .zip(
                 payload
                     .mint_transactions
                     .iter()
                     .map(|m| m.signer_signature.clone()),
             )
-            .zip(futs_result[1].clone().into_iter())
-            .map(|((a, b), c)| (a, b, c))
             .collect::<Vec<_>>();
 
-        for (sig1, sig2, sig3) in signatures {
+        for ((sig1, sig2), sig3) in signatures {
             let key = key.clone();
+            let mut signatures = Vec::new();
+            let content = bs58::decode(sig1.content).into_vec()?;
 
             let sig1_bytes = <[u8; 64]>::from_hex(sig1.signature.full_sig)?;
-            let sig1 = bs58::encode(sig1_bytes).into_string();
+            signatures.push(bs58::encode(sig1_bytes).into_string());
 
-            let sig3_bytes = <[u8; 64]>::from_hex(sig3.signature.full_sig)?;
-            let sig3 = bs58::encode(sig3_bytes).into_string();
+            let sig2_bytes = <[u8; 64]>::from_hex(sig2.signature.full_sig)?;
+            signatures.push(bs58::encode(sig2_bytes).into_string());
 
-            let mut signed_message_signatures = vec![sig1, sig3];
-
-            // this will be true if mint is uncompressed
-            if let Some(sig2) = sig2 {
-                signed_message_signatures.insert(1, sig2);
+            // Uncompressed mint message needs to be signed by mint key pair
+            if let Some(sig3) = sig3 {
+                signatures.insert(1, sig3);
             }
 
             let txn = SolanaTransactionResult {
-                serialized_message: None,
-                signed_message_signatures,
+                serialized_message: Some(content),
+                signed_message_signatures: signatures,
                 status: TransactionStatus::Completed.into(),
             };
 
