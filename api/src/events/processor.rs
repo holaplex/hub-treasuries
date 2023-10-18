@@ -71,8 +71,6 @@ pub enum ProcessorError {
     DbError(#[from] DbErr),
     #[error("Error sending message")]
     SendError(#[from] SendError),
-    #[error("Base58 decode error")]
-    Bs58DecodeError(#[from] bs58::decode::Error),
 }
 
 pub type Result<T> = std::result::Result<T, ProcessorError>;

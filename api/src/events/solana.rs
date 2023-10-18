@@ -236,7 +236,7 @@ impl<'a> Solana<'a> {
         for ((sig1, sig2), sig3) in signatures {
             let key = key.clone();
             let mut signatures = Vec::new();
-            let content = bs58::decode(sig1.content).into_vec()?;
+            let content = hex::decode(sig1.content)?;
 
             let sig1_bytes = <[u8; 64]>::from_hex(sig1.signature.full_sig)?;
             signatures.push(bs58::encode(sig1_bytes).into_string());
