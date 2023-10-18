@@ -49,6 +49,8 @@ pub enum ProcessorError {
     MissingSafeTransferFromTxn,
     #[error("Signed message not found in transaction response")]
     MissingSignedMessage,
+    #[error("Invalid number of signer pubkeys")]
+    InvalidNumberOfSigners,
 
     #[error("Invalid ECDSA pubkey recovery scalar")]
     #[permanent]

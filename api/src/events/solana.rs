@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 use hex::FromHex;
 use hub_core::{
@@ -8,12 +8,13 @@ use hub_core::{
 
 use super::{
     signer::{find_vault_id_by_wallet_address, sign_message, Sign},
-    Processor, Result,
+    Processor, ProcessorError, Result,
 };
 use crate::proto::{
     solana_nft_events::Event as SolanaNftEvent,
     treasury_events::{Event, SolanaTransactionResult, TransactionStatus},
-    SolanaNftEventKey, SolanaNftEvents, SolanaPendingTransaction, TreasuryEventKey, TreasuryEvents,
+    SolanaMintPendingTransactions, SolanaMintTransaction, SolanaNftEventKey, SolanaNftEvents,
+    SolanaPendingTransaction, TreasuryEventKey, TreasuryEvents,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -154,7 +155,152 @@ impl<'a> Solana<'a> {
                 self.send_and_notify(EventKind::RetryMintOpenDrop, key, payload)
                     .await?;
             },
+            Some(SolanaNftEvent::MintOpenDropBatchedSigningRequested(payload)) => {
+                self.sign_mint_batch(key, payload).await?;
+            },
             _ => (),
+        }
+
+        Ok(())
+    }
+
+    pub async fn sign_mint_batch(
+        &self,
+        key: SolanaNftEventKey,
+        payload: SolanaMintPendingTransactions,
+    ) -> Result<()> {
+        let conn = self.0.db.get();
+        let fireblocks = &self.0.fireblocks;
+        let pubkeys = payload.signers_pubkeys.clone();
+
+        if pubkeys.len() != 2 {
+            return Err(ProcessorError::InvalidNumberOfSigners);
+        }
+
+        let note = &format!(
+            "Mint batch signing for collection {:?} by {:?} for project {:?}",
+            key.id, key.user_id, key.project_id,
+        );
+
+        let messages = &payload
+            .mint_transactions
+            .clone()
+            .into_iter()
+            .map(|m| m.serialized_message)
+            .collect::<Vec<_>>();
+
+        let tx = |vault: String| async move {
+            let asset_id = fireblocks.assets().id("SOL");
+
+            let transaction = fireblocks
+                .client()
+                .create()
+                .raw_transaction(asset_id, vault, messages.clone(), note.to_string())
+                .await
+                .map_err(ProcessorError::Fireblocks)?;
+
+            let details = fireblocks
+                .client()
+                .wait_on_transaction_completion(transaction.id)
+                .await
+                .map_err(ProcessorError::Fireblocks)?;
+
+            Result::<_>::Ok(details)
+        };
+
+        let mut futures = Vec::new();
+
+        for req_sig in pubkeys.clone() {
+            let vault_id = find_vault_id_by_wallet_address(conn, req_sig).await?;
+            futures.push(tx(vault_id));
+        }
+
+        let futs_result = future::join_all(futures)
+            .await
+            .into_iter()
+            .map(|r| r.map(|d| d.signed_messages))
+            .collect::<Result<Vec<_>>>();
+
+        match futs_result {
+            Ok(results) => {
+                let mut hashmap = HashMap::new();
+                for messages in results {
+                    for msg in messages {
+                        let bytes = <[u8; 64]>::from_hex(msg.signature.full_sig)?;
+                        let signature = bs58::encode(bytes).into_string();
+
+                        hashmap
+                            .entry(msg.content)
+                            .or_insert(Vec::new())
+                            .push(signature);
+                    }
+                }
+
+                for tx in payload.mint_transactions {
+                    let key = key.clone();
+
+                    let SolanaMintTransaction {
+                        mint_id,
+                        signer_signature,
+                        serialized_message,
+                    } = tx;
+
+                    let hex_message = hex::encode(serialized_message.clone());
+
+                    let mut signatures = hashmap
+                        .get(&hex_message)
+                        .ok_or(ProcessorError::MissingSignedMessage)?
+                        .clone();
+
+                    // Uncompressed mint message needs to be signed by mint key pair
+                    if let Some(signer_signature) = signer_signature {
+                        signatures.insert(1, signer_signature);
+                    }
+
+                    let txn = SolanaTransactionResult {
+                        serialized_message: Some(serialized_message),
+                        signed_message_signatures: signatures,
+                        status: TransactionStatus::Completed.into(),
+                    };
+
+                    let evt = Event::SolanaMintOpenDropSigned(txn);
+                    self.producer()
+                        .send(
+                            Some(&TreasuryEvents { event: Some(evt) }),
+                            Some(&TreasuryEventKey {
+                                id: mint_id,
+                                user_id: key.user_id,
+                                project_id: key.project_id,
+                            }),
+                        )
+                        .await?;
+                }
+            },
+
+            Err(e) => {
+                error!("Error signing mint batch: {:?}", e);
+
+                let txn = SolanaTransactionResult {
+                    serialized_message: None,
+                    signed_message_signatures: vec![],
+                    status: TransactionStatus::Failed.into(),
+                };
+
+                for tx in payload.mint_transactions {
+                    let evt = Event::SolanaMintOpenDropSigned(txn.clone());
+                    let key = key.clone();
+                    self.producer()
+                        .send(
+                            Some(&TreasuryEvents { event: Some(evt) }),
+                            Some(&TreasuryEventKey {
+                                id: tx.mint_id,
+                                user_id: key.user_id,
+                                project_id: key.project_id,
+                            }),
+                        )
+                        .await?;
+                }
+            },
         }
 
         Ok(())
