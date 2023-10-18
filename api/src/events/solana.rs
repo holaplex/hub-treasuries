@@ -13,8 +13,8 @@ use super::{
 use crate::proto::{
     solana_nft_events::Event as SolanaNftEvent,
     treasury_events::{Event, SolanaTransactionResult, TransactionStatus},
-    SolanaMintPendingTransactions, SolanaNftEventKey, SolanaNftEvents, SolanaPendingTransaction,
-    TreasuryEventKey, TreasuryEvents,
+    SolanaMintPendingTransactions, SolanaMintTransaction, SolanaNftEventKey, SolanaNftEvents,
+    SolanaPendingTransaction, TreasuryEventKey, TreasuryEvents,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -225,18 +225,18 @@ impl<'a> Solana<'a> {
             .clone()
             .into_iter()
             .zip(futs_result[1].clone().into_iter())
-            .zip(
-                payload
-                    .mint_transactions
-                    .iter()
-                    .map(|m| m.signer_signature.clone()),
-            )
+            .zip(payload.mint_transactions.into_iter())
             .collect::<Vec<_>>();
 
-        for ((sig1, sig2), sig3) in signatures {
-            let key = key.clone();
+        for ((sig1, sig2), mint_transaction) in signatures {
             let mut signatures = Vec::new();
-            let content = hex::decode(sig1.content)?;
+            let key = key.clone();
+
+            let SolanaMintTransaction {
+                serialized_message,
+                mint_id,
+                signer_signature,
+            } = mint_transaction;
 
             let sig1_bytes = <[u8; 64]>::from_hex(sig1.signature.full_sig)?;
             signatures.push(bs58::encode(sig1_bytes).into_string());
@@ -245,12 +245,12 @@ impl<'a> Solana<'a> {
             signatures.push(bs58::encode(sig2_bytes).into_string());
 
             // Uncompressed mint message needs to be signed by mint key pair
-            if let Some(sig3) = sig3 {
-                signatures.insert(1, sig3);
+            if let Some(signer_signature) = signer_signature {
+                signatures.insert(1, signer_signature);
             }
 
             let txn = SolanaTransactionResult {
-                serialized_message: Some(content),
+                serialized_message: Some(serialized_message),
                 signed_message_signatures: signatures,
                 status: TransactionStatus::Completed.into(),
             };
@@ -259,7 +259,11 @@ impl<'a> Solana<'a> {
             self.producer()
                 .send(
                     Some(&TreasuryEvents { event: Some(evt) }),
-                    Some(&key.into()),
+                    Some(&TreasuryEventKey {
+                        id: mint_id,
+                        user_id: key.user_id,
+                        project_id: key.project_id,
+                    }),
                 )
                 .await?;
         }
