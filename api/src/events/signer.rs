@@ -70,7 +70,7 @@ pub(crate) async fn sign_message<G: Sign>(
     let transaction = fireblocks
         .client()
         .create()
-        .raw_transaction(asset_id, vault_id, message, note)
+        .raw_transaction(asset_id, vault_id, vec![message], note)
         .await
         .map_err(ProcessorError::Fireblocks)?;
 

@@ -471,7 +471,7 @@ impl CreateRequestBuilder {
         &self,
         asset_id: String,
         vault_id: String,
-        message: Vec<u8>,
+        messages: Vec<Vec<u8>>,
         note: String,
     ) -> Result<CreateTransactionResponse> {
         let tx = CreateTransaction {
@@ -488,9 +488,12 @@ impl CreateRequestBuilder {
             amount: "0".to_string(),
             feelevel: None,
             extra_parameters: Some(ExtraParameters::RawMessageData(RawMessageData {
-                messages: vec![UnsignedMessage {
-                    content: hex::encode(&message),
-                }],
+                messages: messages
+                    .into_iter()
+                    .map(|m| UnsignedMessage {
+                        content: hex::encode(m),
+                    })
+                    .collect(),
             })),
             note: Some(note),
         };

@@ -1,5 +1,6 @@
 use fireblocks::Fireblocks;
 use hub_core::{
+    bs58,
     prelude::*,
     producer::{Producer, SendError},
     thiserror, uuid,
@@ -49,6 +50,8 @@ pub enum ProcessorError {
     MissingSafeTransferFromTxn,
     #[error("Signed message not found in transaction response")]
     MissingSignedMessage,
+    #[error("Invalid number of signer pubkeys")]
+    InvalidNumberOfSigners,
 
     #[error("Invalid ECDSA pubkey recovery scalar")]
     #[permanent]
@@ -68,6 +71,8 @@ pub enum ProcessorError {
     DbError(#[from] DbErr),
     #[error("Error sending message")]
     SendError(#[from] SendError),
+    #[error("Base58 decode error")]
+    Bs58DecodeError(#[from] bs58::decode::Error),
 }
 
 pub type Result<T> = std::result::Result<T, ProcessorError>;
