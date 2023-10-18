@@ -1,6 +1,5 @@
 use fireblocks::Fireblocks;
 use hub_core::{
-    bs58,
     prelude::*,
     producer::{Producer, SendError},
     thiserror, uuid,

@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 use hex::FromHex;
 use hub_core::{
@@ -219,53 +219,88 @@ impl<'a> Solana<'a> {
             .await
             .into_iter()
             .map(|r| r.map(|d| d.signed_messages))
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<Result<Vec<_>>>();
 
-        let signatures = futs_result[0]
-            .clone()
-            .into_iter()
-            .zip(futs_result[1].clone().into_iter())
-            .zip(payload.mint_transactions.into_iter())
-            .collect::<Vec<_>>();
+        match futs_result {
+            Ok(results) => {
+                let mut hashmap = HashMap::new();
+                for messages in results {
+                    for msg in messages {
+                        let bytes = <[u8; 64]>::from_hex(msg.signature.full_sig)?;
+                        let signature = bs58::encode(bytes).into_string();
 
-        for ((sig1, sig2), mint_transaction) in signatures {
-            let mut signatures = Vec::new();
-            let key = key.clone();
+                        hashmap
+                            .entry(msg.content)
+                            .or_insert(Vec::new())
+                            .push(signature);
+                    }
+                }
 
-            let SolanaMintTransaction {
-                serialized_message,
-                mint_id,
-                signer_signature,
-            } = mint_transaction;
+                for tx in payload.mint_transactions {
+                    let key = key.clone();
 
-            let sig1_bytes = <[u8; 64]>::from_hex(sig1.signature.full_sig)?;
-            signatures.push(bs58::encode(sig1_bytes).into_string());
+                    let SolanaMintTransaction {
+                        mint_id,
+                        signer_signature,
+                        serialized_message,
+                    } = tx;
 
-            let sig2_bytes = <[u8; 64]>::from_hex(sig2.signature.full_sig)?;
-            signatures.push(bs58::encode(sig2_bytes).into_string());
+                    let hex_message = hex::encode(serialized_message.clone());
 
-            // Uncompressed mint message needs to be signed by mint key pair
-            if let Some(signer_signature) = signer_signature {
-                signatures.insert(1, signer_signature);
-            }
+                    let mut signatures = hashmap
+                        .get(&hex_message)
+                        .ok_or(ProcessorError::MissingSignedMessage)?
+                        .clone();
 
-            let txn = SolanaTransactionResult {
-                serialized_message: Some(serialized_message),
-                signed_message_signatures: signatures,
-                status: TransactionStatus::Completed.into(),
-            };
+                    // Uncompressed mint message needs to be signed by mint key pair
+                    if let Some(signer_signature) = signer_signature {
+                        signatures.insert(1, signer_signature);
+                    }
 
-            let evt = Event::SolanaMintOpenDropSigned(txn);
-            self.producer()
-                .send(
-                    Some(&TreasuryEvents { event: Some(evt) }),
-                    Some(&TreasuryEventKey {
-                        id: mint_id,
-                        user_id: key.user_id,
-                        project_id: key.project_id,
-                    }),
-                )
-                .await?;
+                    let txn = SolanaTransactionResult {
+                        serialized_message: Some(serialized_message),
+                        signed_message_signatures: signatures,
+                        status: TransactionStatus::Completed.into(),
+                    };
+
+                    let evt = Event::SolanaMintOpenDropSigned(txn);
+                    self.producer()
+                        .send(
+                            Some(&TreasuryEvents { event: Some(evt) }),
+                            Some(&TreasuryEventKey {
+                                id: mint_id,
+                                user_id: key.user_id,
+                                project_id: key.project_id,
+                            }),
+                        )
+                        .await?;
+                }
+            },
+
+            Err(e) => {
+                error!("Error signing mint batch: {:?}", e);
+
+                let txn = SolanaTransactionResult {
+                    serialized_message: None,
+                    signed_message_signatures: vec![],
+                    status: TransactionStatus::Failed.into(),
+                };
+
+                for tx in payload.mint_transactions {
+                    let evt = Event::SolanaMintOpenDropSigned(txn.clone());
+                    let key = key.clone();
+                    self.producer()
+                        .send(
+                            Some(&TreasuryEvents { event: Some(evt) }),
+                            Some(&TreasuryEventKey {
+                                id: tx.mint_id,
+                                user_id: key.user_id,
+                                project_id: key.project_id,
+                            }),
+                        )
+                        .await?;
+                }
+            },
         }
 
         Ok(())
